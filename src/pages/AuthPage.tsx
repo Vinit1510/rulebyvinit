@@ -99,6 +99,53 @@ export function AuthPage() {
               Continue Offline (Local Sandbox)
             </Button>
 
+            <div className="flex justify-center pt-0.5">
+              <input
+                type="file"
+                id="offline-backup-upload"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    try {
+                      const data = JSON.parse(event.target?.result as string);
+                      if (data && (Array.isArray(data.invoices) || data.turnover)) {
+                        localStorage.setItem("gst-itc-calc-v2", JSON.stringify(data));
+                        localStorage.setItem("r43_working_offline", "true");
+                        toast({
+                          title: "Backup Restored Successfully!",
+                          description: "Redirecting you to your offline workspace...",
+                        });
+                        setTimeout(() => {
+                          window.location.href = basePath + "/";
+                        }, 800);
+                      } else {
+                        throw new Error("Invalid backup structure");
+                      }
+                    } catch (err) {
+                      toast({
+                        title: "Failed to Restore Backup",
+                        description: "The selected file is not a valid Rule 43 backup JSON.",
+                        variant: "destructive",
+                      });
+                    }
+                  };
+                  reader.readAsText(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="link"
+                className="text-[11px] text-muted-foreground hover:text-primary h-auto py-1 tracking-wide"
+                onClick={() => document.getElementById("offline-backup-upload")?.click()}
+              >
+                Import Local Backup (.json)
+              </Button>
+            </div>
+
             {!clientId && (
               <div className="flex items-start gap-2 p-3 bg-amber-500/10 text-amber-500 rounded-lg text-xs border border-amber-500/20">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
