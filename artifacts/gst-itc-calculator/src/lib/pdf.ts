@@ -1,0 +1,384 @@
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { periodLabel } from "./excel";
+
+const BRAND = [15, 118, 110] as [number, number, number];     // teal-700
+const HEADER = [31, 41, 55] as [number, number, number];      // gray-800
+const BAND = [226, 232, 240] as [number, number, number];     // slate-200
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export interface PdfDetailedRow {
+  period: string;          // "YYYY-MM"
+  invoiceNo: string;
+  partyName: string;
+  asset: string;
+  taxableValue: number;
+  gstPercent: number;
+  exemptPercent: number;
+  eligibleItc: number;
+  reversal: number;
+  netClaim: number;
+  igstReversal?: number;
+  cgstReversal?: number;
+  sgstReversal?: number;
+}
+
+export interface PdfBlockedRow {
+  date: string;
+  invoiceNo: string;
+  partyName: string;
+  asset: string;
+  taxableValue: number;
+  gstPercent: number;
+  blockedItc: number;
+  reason?: string;
+}
+
+export interface Rule43PdfOptions {
+  filterTitle: string;
+  totalEntries: number;
+  totalCapitalGoodsValue: number;
+  totalActualItc: number;
+  totalReversal: number;
+  netItcClaimed: number;
+  detailedRows: PdfDetailedRow[];
+  blockedRows?: PdfBlockedRow[];
+  totalBlockedItc?: number;
+}
+
+export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Title band
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RULE 43 REPORT", pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
+
+  // Summary block
+  const summaryRows: Array<[string, string]> = [
+    ["Total Entries", String(opts.totalEntries)],
+    ["Total Capital Goods Value", fmt(opts.totalCapitalGoodsValue)],
+    ["Total ITC (incl. CN/DN adj.)", fmt(opts.totalActualItc)],
+    ["Total Reversal", fmt(opts.totalReversal)],
+    ["Net ITC Claimed", fmt(opts.netItcClaimed)],
+  ];
+  if ((opts.totalBlockedItc ?? 0) > 0) {
+    summaryRows.push(["Blocked Credit u/s 17(5)", fmt(opts.totalBlockedItc!)]);
+  }
+
+  autoTable(doc, {
+    startY: 60,
+    head: [["SUMMARY", ""]],
+    body: summaryRows,
+    theme: "grid",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 11 },
+    bodyStyles: { fontSize: 10 },
+    columnStyles: {
+      0: { cellWidth: 220, fontStyle: "bold", fillColor: BAND },
+      1: { halign: "right", cellWidth: 160 },
+    },
+    margin: { left: 24, right: 24 },
+  });
+
+  // Detailed records
+  const lastY = (doc as any).lastAutoTable.finalY + 16;
+  const sumIgst = opts.detailedRows.reduce((s, x) => s + (x.igstReversal ?? 0), 0);
+  const sumCgst = opts.detailedRows.reduce((s, x) => s + (x.cgstReversal ?? 0), 0);
+  const sumSgst = opts.detailedRows.reduce((s, x) => s + (x.sgstReversal ?? 0), 0);
+  autoTable(doc, {
+    startY: lastY,
+    head: [[
+      "Period", "Invoice No", "Party", "Asset",
+      "Taxable Value", "GST%", "Exempt%", "Eligible ITC",
+      "IGST Rev", "CGST Rev", "SGST Rev", "Total Rev", "Net Claim",
+    ]],
+    body: opts.detailedRows.map((r) => [
+      periodLabel(r.period),
+      r.invoiceNo,
+      r.partyName,
+      r.asset,
+      fmt(r.taxableValue),
+      r.gstPercent.toFixed(2),
+      r.exemptPercent.toFixed(2),
+      fmt(r.eligibleItc),
+      fmt(r.igstReversal ?? 0),
+      fmt(r.cgstReversal ?? 0),
+      fmt(r.sgstReversal ?? 0),
+      fmt(r.reversal),
+      fmt(r.netClaim),
+    ]),
+    foot: [[
+      "TOTAL", "", "", "",
+      fmt(opts.totalCapitalGoodsValue), "", "",
+      fmt(opts.detailedRows.reduce((s, x) => s + x.eligibleItc, 0)),
+      fmt(sumIgst), fmt(sumCgst), fmt(sumSgst),
+      fmt(opts.totalReversal),
+      fmt(opts.netItcClaimed),
+    ]],
+    theme: "striped",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 8, halign: "center" },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 8, halign: "right" },
+    bodyStyles: { fontSize: 7 },
+    columnStyles: {
+      4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" },
+      7: { halign: "right" },
+      8:  { halign: "right", textColor: [185, 28, 28] },
+      9:  { halign: "right", textColor: [185, 28, 28] },
+      10: { halign: "right", textColor: [185, 28, 28] },
+      11: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+      12: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
+    },
+    margin: { left: 18, right: 18 },
+    didDrawPage: () => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(`Generated by Rule 43 ITC Calculator · ${new Date().toLocaleDateString("en-IN")}`, w / 2, h - 12, { align: "center" });
+    },
+  });
+
+  // Blocked credit page
+  if (opts.blockedRows && opts.blockedRows.length > 0) {
+    doc.addPage();
+    doc.setFillColor(185, 28, 28);
+    doc.rect(0, 0, pageWidth, 48, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+    doc.text("BLOCKED CREDIT — Section 17(5)", pageWidth / 2, 22, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text(`Total Blocked ITC: Rs. ${fmt(opts.totalBlockedItc ?? 0)}`, pageWidth / 2, 38, { align: "center" });
+    autoTable(doc, {
+      startY: 60,
+      head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "GST%", "Blocked ITC", "Reason"]],
+      body: opts.blockedRows.map((r) => [
+        r.date, r.invoiceNo, r.partyName, r.asset,
+        fmt(r.taxableValue), r.gstPercent.toFixed(2), fmt(r.blockedItc), r.reason ?? "",
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        4: { halign: "right" }, 5: { halign: "right" },
+        6: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+      },
+      margin: { left: 24, right: 24 },
+    });
+  }
+
+  doc.save(filename);
+}
+
+export interface InvoicePdfRow {
+  period: string;
+  ratio: number;
+  monthlyItc: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  reversal: number;
+  retained: number;
+  cumReversal: number;
+}
+
+export function exportInvoicePdf(opts: {
+  invoiceNo: string;
+  asset: string;
+  supplier: string;
+  totalItc: number;
+  totalReversal: number;
+  totalRetained: number;
+  rows: InvoicePdfRow[];
+  filterTitle?: string;
+}, filename: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+  doc.text(`Rule 43 Working — ${opts.invoiceNo || "(no #)"}`, pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.text(`${opts.asset || ""} · ${opts.supplier || ""}${opts.filterTitle ? " · " + opts.filterTitle : ""}`, pageWidth / 2, 38, { align: "center" });
+
+  autoTable(doc, {
+    startY: 60,
+    head: [["Total ITC", "Total Reversal", "Total Retained"]],
+    body: [[fmt(opts.totalItc), fmt(opts.totalReversal), fmt(opts.totalRetained)]],
+    theme: "grid",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 10 },
+    bodyStyles: { halign: "right", fontSize: 11, fontStyle: "bold" },
+    margin: { left: 24, right: 24 },
+  });
+
+  const y = (doc as any).lastAutoTable.finalY + 16;
+  const sumTm   = opts.rows.reduce((s, x) => s + x.monthlyItc, 0);
+  const sumIgst = opts.rows.reduce((s, x) => s + x.igst, 0);
+  const sumCgst = opts.rows.reduce((s, x) => s + x.cgst, 0);
+  const sumSgst = opts.rows.reduce((s, x) => s + x.sgst, 0);
+  const sumRev  = opts.rows.reduce((s, x) => s + x.reversal, 0);
+  const sumRet  = opts.rows.reduce((s, x) => s + x.retained, 0);
+  const lastCum = opts.rows.length ? opts.rows[opts.rows.length - 1].cumReversal : 0;
+  autoTable(doc, {
+    startY: y,
+    head: [["Period", "Ratio %", "Tm", "IGST Rev", "CGST Rev", "SGST Rev", "Total Rev", "Retained", "Cum Rev"]],
+    body: opts.rows.map((r) => [
+      periodLabel(r.period), (r.ratio * 100).toFixed(2),
+      fmt(r.monthlyItc), fmt(r.igst), fmt(r.cgst), fmt(r.sgst),
+      fmt(r.reversal), fmt(r.retained), fmt(r.cumReversal),
+    ]),
+    foot: opts.rows.length > 0 ? [[
+      `TOTAL (${opts.rows.length} months)`, "",
+      fmt(sumTm), fmt(sumIgst), fmt(sumCgst), fmt(sumSgst),
+      fmt(sumRev), fmt(sumRet), fmt(lastCum),
+    ]] : undefined,
+    theme: "striped",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 9, halign: "right" },
+    bodyStyles: { fontSize: 8, halign: "right" },
+    columnStyles: {
+      0: { halign: "left" },
+      3: { textColor: [185, 28, 28] },
+      4: { textColor: [185, 28, 28] },
+      5: { textColor: [185, 28, 28] },
+      6: { textColor: [185, 28, 28], fontStyle: "bold" },
+      7: { textColor: [21, 128, 61], fontStyle: "bold" },
+    },
+    margin: { left: 24, right: 24 },
+  });
+  doc.save(filename);
+}
+
+export function exportRegisterPdf(opts: {
+  rows: Array<{
+    invoiceNo: string; date: string; asset: string; supplier: string;
+    taxableValue: number; netItc: number; igstRev: number; cgstRev: number; sgstRev: number;
+    retained: number; status: string;
+  }>;
+  blockedRows?: PdfBlockedRow[];
+  totalBlockedItc?: number;
+}, filename: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 40, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+  doc.text("Capital Goods Register", pageWidth / 2, 24, { align: "center" });
+
+  autoTable(doc, {
+    startY: 50,
+    head: [["Invoice", "Date", "Asset / Supplier", "Taxable Value", "Net ITC",
+      "IGST Rev", "CGST Rev", "SGST Rev", "Retained", "Status"]],
+    body: opts.rows.map((r) => [
+      r.invoiceNo || "—", r.date || "—", `${r.asset}\n${r.supplier}`,
+      fmt(r.taxableValue), fmt(r.netItc),
+      fmt(r.igstRev), fmt(r.cgstRev), fmt(r.sgstRev),
+      fmt(r.retained), r.status,
+    ]),
+    theme: "striped",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: {
+      3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" },
+      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
+      8: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
+    },
+    margin: { left: 24, right: 24 },
+  });
+
+  if (opts.blockedRows && opts.blockedRows.length > 0) {
+    doc.addPage();
+    doc.setFillColor(185, 28, 28);
+    doc.rect(0, 0, pageWidth, 48, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+    doc.text("BLOCKED CREDIT — Section 17(5)", pageWidth / 2, 22, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text(`Total Blocked ITC: Rs. ${fmt(opts.totalBlockedItc ?? 0)}`, pageWidth / 2, 38, { align: "center" });
+    autoTable(doc, {
+      startY: 60,
+      head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "GST%", "Blocked ITC", "Reason"]],
+      body: opts.blockedRows.map((r) => [
+        r.date, r.invoiceNo, r.partyName, r.asset,
+        fmt(r.taxableValue), r.gstPercent.toFixed(2), fmt(r.blockedItc), r.reason ?? "",
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        4: { halign: "right" }, 5: { halign: "right" },
+        6: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+      },
+      margin: { left: 24, right: 24 },
+    });
+  }
+
+  doc.save(filename);
+}
+
+// ---------- Standalone Blocked Credit PDF (Section 17(5)) ----------
+export function exportBlockedCreditPdf(opts: {
+  filterTitle: string;
+  rows: PdfBlockedRow[];
+  totalBlockedItc: number;
+}, filename: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFillColor(185, 28, 28);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+  doc.text("BLOCKED CREDIT — Section 17(5)", pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
+
+  autoTable(doc, {
+    startY: 60,
+    head: [["SUMMARY", ""]],
+    body: [
+      ["Total Blocked Entries", String(opts.rows.length)],
+      ["Total Blocked ITC (ineligible)", fmt(opts.totalBlockedItc)],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 11 },
+    bodyStyles: { fontSize: 10 },
+    columnStyles: { 0: { cellWidth: 240, fontStyle: "bold", fillColor: BAND }, 1: { halign: "right", cellWidth: 180 } },
+    margin: { left: 24, right: 24 },
+  });
+
+  const y = (doc as any).lastAutoTable.finalY + 16;
+  autoTable(doc, {
+    startY: y,
+    head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "GST%", "Blocked ITC", "Reason / Notes"]],
+    body: opts.rows.map((r) => [
+      r.date, r.invoiceNo, r.partyName, r.asset,
+      fmt(r.taxableValue), r.gstPercent.toFixed(2), fmt(r.blockedItc), r.reason ?? "",
+    ]),
+    foot: [["TOTAL", "", "", "", "", "", fmt(opts.totalBlockedItc), ""]],
+    theme: "striped",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: {
+      4: { halign: "right" }, 5: { halign: "right" },
+      6: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+    },
+    margin: { left: 24, right: 24 },
+    didDrawPage: () => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(`Generated by Rule 43 ITC Calculator · ${new Date().toLocaleDateString("en-IN")}`, w / 2, h - 12, { align: "center" });
+    },
+  });
+
+  doc.save(filename);
+}
