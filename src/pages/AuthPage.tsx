@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calculator, Loader2, Key, Settings, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 function GoogleIcon() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
