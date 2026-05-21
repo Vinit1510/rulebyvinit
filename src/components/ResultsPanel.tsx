@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Download, Printer, AlertCircle, ShieldAlert } from "lucide-react";
+import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown } from "lucide-react";
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
@@ -23,6 +23,9 @@ import {
 } from "@/lib/excel";
 import { exportRule43Pdf, exportInvoicePdf, exportRegisterPdf, exportBlockedCreditPdf } from "@/lib/pdf";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface Props {
   invoices: Invoice[];
@@ -544,6 +547,7 @@ function ConsolidatedReport({
 
 function PerInvoiceReport({ invoices, turnover }: { invoices: Invoice[]; turnover: Record<string, MonthlyTurnover> }) {
   const [selected, setSelected] = useState<string>(invoices[0]?.id ?? "");
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const [fyFilter, setFyFilter] = useState<string>("all");
   const inv = invoices.find((i) => i.id === selected) ?? invoices[0];
   const result = useMemo(() => computeInvoice(inv, turnover), [inv, turnover]);
@@ -612,16 +616,55 @@ function PerInvoiceReport({ invoices, turnover }: { invoices: Invoice[]; turnove
         <CardContent className="py-4 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs text-muted-foreground">Invoice</span>
-            <Select value={selected} onValueChange={setSelected}>
-              <SelectTrigger className="min-w-[280px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {invoices.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>
-                    {i.invoiceNo || "(no #)"} — {i.assetName || i.supplier || "Untitled"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboboxOpen}
+                  className="min-w-[280px] max-w-[340px] justify-between text-xs h-9 font-normal bg-background"
+                >
+                  <span className="truncate">
+                    {inv
+                      ? `${inv.invoiceNo || "(no #)"} — ${inv.assetName || inv.supplier || "Untitled"}`
+                      : "Select invoice..."}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[340px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search invoice number, asset, supplier..." className="h-9 text-xs" />
+                  <CommandList className="max-h-[260px] overflow-y-auto">
+                    <CommandEmpty className="py-3 text-center text-xs text-muted-foreground">No invoice found.</CommandEmpty>
+                    <CommandGroup>
+                      {invoices.map((i) => (
+                        <CommandItem
+                          key={i.id}
+                          value={`${i.invoiceNo || ""} ${i.assetName || ""} ${i.supplier || ""}`}
+                          onSelect={() => {
+                            setSelected(i.id);
+                            setComboboxOpen(false);
+                          }}
+                          className="text-xs cursor-pointer flex items-center justify-between py-2.5 px-3"
+                        >
+                          <span className="truncate mr-2">
+                            <span className="font-semibold text-foreground">{i.invoiceNo || "(no #)"}</span>
+                            <span className="text-muted-foreground"> — {i.assetName || i.supplier || "Untitled"}</span>
+                          </span>
+                          <Check
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0 text-primary",
+                              selected === i.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <span className="text-xs text-muted-foreground">FY</span>
             <Select value={fyFilter} onValueChange={setFyFilter}>
               <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue /></SelectTrigger>
