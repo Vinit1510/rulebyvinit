@@ -469,13 +469,6 @@ export function ImportModal({ open, onClose, onImport }: Props) {
             </Alert>
           )}
 
-          <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground">Column name examples (case-insensitive):</p>
-            <p>Invoice Number, Supplier Name, Supplier GSTIN, Asset Description, Purchase Date, Taxable Value</p>
-            <p>Date format: <strong>DD-MM-YYYY</strong> (e.g. 15-04-2025)</p>
-            <p>For tax: <strong>IGST Rate</strong> + <strong>CGST Rate</strong> + <strong>SGST Rate</strong> — or — <strong>GST Rate</strong> (treated as IGST)</p>
-            <p>Usage Type: taxable / exempt / common</p>
-          </div>
         </div>
 
         <DialogFooter>
