@@ -393,12 +393,12 @@ export function ImportModal({ open, onClose, onImport }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-6">
         <DialogHeader>
           <DialogTitle>Import invoices from CSV / Excel</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 flex-1 overflow-y-auto pr-1">
           <div className="rounded-md border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
             <div className="text-xs">
               <p className="font-medium text-foreground">Need a starting point?</p>
