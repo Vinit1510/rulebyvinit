@@ -40,6 +40,7 @@ export interface Invoice extends GstComponents {
   id: string;
   invoiceNo: string;
   supplier: string;
+  gstin?: string;
   assetName: string;
   purchaseDate: string;
   taxableValue: number;
@@ -222,6 +223,7 @@ export function newInvoice(): Invoice {
     id: makeId(),
     invoiceNo: "",
     supplier: "",
+    gstin: "",
     assetName: "",
     purchaseDate: "",
     taxableValue: 0,

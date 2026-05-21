@@ -41,6 +41,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
       (inv.invoiceNo || "").toLowerCase().includes(query) ||
       (inv.assetName || "").toLowerCase().includes(query) ||
       (inv.supplier || "").toLowerCase().includes(query) ||
+      (inv.gstin || "").toLowerCase().includes(query) ||
       (inv.notes || "").toLowerCase().includes(query)
     );
   });
@@ -91,7 +92,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                 <div className="relative max-w-md w-full">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search invoices by number, asset, supplier, or notes..."
+                    placeholder="Search invoices by number, asset, supplier, GSTIN or notes..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="h-9 text-xs pl-9 bg-background w-full"
@@ -144,7 +145,14 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                           <TableCell className="text-sm">{inv.purchaseDate || "—"}</TableCell>
                           <TableCell>
                             <div className="text-sm">{inv.assetName || "—"}</div>
-                            <div className="text-xs text-muted-foreground">{inv.supplier || "—"}</div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <span>{inv.supplier || "—"}</span>
+                              {inv.gstin && (
+                                <span className="font-mono bg-muted text-muted-foreground px-1.5 py-0.2 border rounded text-[9px]">
+                                  {inv.gstin}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right num text-sm">{formatINR(inv.taxableValue)}</TableCell>
                           <TableCell className="text-right text-xs">

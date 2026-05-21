@@ -23,6 +23,7 @@ function migrateInvoice(raw: any): Invoice {
   if (inv.igstRate === undefined) inv.igstRate = 0;
   if (inv.cgstRate === undefined) inv.cgstRate = 0;
   if (inv.sgstRate === undefined) inv.sgstRate = 0;
+  if (inv.gstin === undefined) inv.gstin = "";
 
   if (Array.isArray(inv.creditNotes)) {
     inv.creditNotes = inv.creditNotes.map((cn: any) => {

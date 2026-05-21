@@ -880,6 +880,7 @@ function RegisterSummary({ invoices, turnover }: { invoices: Invoice[]; turnover
   const buildRegisterRows = () => data.map(({ inv, res }) => ({
     invoiceNo: inv.invoiceNo, date: inv.purchaseDate,
     asset: inv.assetName, supplier: inv.supplier,
+    gstin: inv.gstin ?? "",
     taxableValue: inv.taxableValue, netItc: res.netTotalItc,
     igstRev: res.igstReversal, cgstRev: res.cgstReversal, sgstRev: res.sgstReversal,
     retained: res.totalRetained, status: STATUS_LABEL[res.status].label,

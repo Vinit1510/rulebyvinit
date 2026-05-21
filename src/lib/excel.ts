@@ -385,6 +385,7 @@ export interface RegisterXlsxRow {
   date: string;
   asset: string;
   supplier: string;
+  gstin?: string;
   taxableValue: number;
   netItc: number;
   igstRev: number;
@@ -400,14 +401,14 @@ export async function exportRegisterXlsx(
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Capital Goods Register", { views: [{ state: "frozen", ySplit: 3 }] });
   ws.columns = [
-    { width: 16 }, { width: 14 }, { width: 26 }, { width: 24 }, { width: 16 },
+    { width: 16 }, { width: 14 }, { width: 26 }, { width: 24 }, { width: 18 }, { width: 16 },
     { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 22 },
   ];
-  ws.mergeCells("A1:K1");
+  ws.mergeCells("A1:L1");
   const t = ws.getCell("A1"); t.value = "CAPITAL GOODS REGISTER"; applyTitleRow(t);
   ws.getRow(1).height = 26;
 
-  const headers = ["Invoice No", "Date", "Asset", "Supplier", "Taxable Value",
+  const headers = ["Invoice No", "Date", "Asset", "Supplier", "GSTIN", "Taxable Value",
     "Net ITC", "IGST Rev.", "CGST Rev.", "SGST Rev.", "Retained", "Status"];
   headers.forEach((h, i) => { const c = ws.getCell(3, i + 1); c.value = h; applyHeader(c); });
   ws.getRow(3).height = 30;
@@ -418,19 +419,20 @@ export async function exportRegisterXlsx(
     ws.getCell(rr, 2).value = row.date || "—";
     ws.getCell(rr, 3).value = row.asset;
     ws.getCell(rr, 4).value = row.supplier;
-    ws.getCell(rr, 5).value = row.taxableValue;
-    ws.getCell(rr, 6).value = row.netItc;
-    ws.getCell(rr, 7).value = row.igstRev;
-    ws.getCell(rr, 8).value = row.cgstRev;
-    ws.getCell(rr, 9).value = row.sgstRev;
-    ws.getCell(rr, 10).value = row.retained;
-    ws.getCell(rr, 11).value = row.status;
-    [5, 6, 7, 8, 9, 10].forEach((col) => applyMoneyFormat(ws.getCell(rr, col)));
-    ws.getCell(rr, 6).font = { bold: true };
-    ws.getCell(rr, 10).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
-    ws.getCell(rr, 10).font = { color: { argb: "FF15803D" }, bold: true };
+    ws.getCell(rr, 5).value = row.gstin || "—";
+    ws.getCell(rr, 6).value = row.taxableValue;
+    ws.getCell(rr, 7).value = row.netItc;
+    ws.getCell(rr, 8).value = row.igstRev;
+    ws.getCell(rr, 9).value = row.cgstRev;
+    ws.getCell(rr, 10).value = row.sgstRev;
+    ws.getCell(rr, 11).value = row.retained;
+    ws.getCell(rr, 12).value = row.status;
+    [6, 7, 8, 9, 10, 11].forEach((col) => applyMoneyFormat(ws.getCell(rr, col)));
+    ws.getCell(rr, 7).font = { bold: true };
+    ws.getCell(rr, 11).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
+    ws.getCell(rr, 11).font = { color: { argb: "FF15803D" }, bold: true };
     applyZebra(ws.getRow(rr), i % 2 === 1);
-    rowBorders(ws, rr, 11);
+    rowBorders(ws, rr, 12);
   });
 
   if (opts.blockedRows && opts.blockedRows.length > 0) {
@@ -508,6 +510,7 @@ export async function downloadImportTemplate() {
     { header: "Invoice Number",   key: "invoiceNo",     width: 18 },
     { header: "Purchase Date",    key: "purchaseDate",  width: 16 },
     { header: "Supplier",         key: "supplier",      width: 26 },
+    { header: "Supplier GSTIN",   key: "gstin",         width: 18 },
     { header: "Asset",            key: "assetName",     width: 28 },
     { header: "Taxable Value",    key: "taxableValue",  width: 16 },
     { header: "IGST Rate",        key: "igstRate",      width: 12 },
@@ -528,10 +531,10 @@ export async function downloadImportTemplate() {
   ws.getRow(1).height = 30;
 
   const samples: Array<Record<string, string | number>> = [
-    { invoiceNo: "INV-001", purchaseDate: "2025-04-15", supplier: "Acme Industries", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  blockCredit: "No",  notes: "" },
-    { invoiceNo: "INV-002", purchaseDate: "2025-05-10", supplier: "Steel Mart",      assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  blockCredit: "No",  notes: "Inter-state" },
-    { invoiceNo: "INV-003", purchaseDate: "2025-06-01", supplier: "Auto World",      assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "common",  blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
-    { invoiceNo: "INV-004", purchaseDate: "2025-07-22", supplier: "Office Supplies", assetName: "Air Conditioner", taxableValue: 75000,  igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "taxable", blockCredit: "No",  notes: "" },
+    { invoiceNo: "INV-001", purchaseDate: "2025-04-15", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  blockCredit: "No",  notes: "" },
+    { invoiceNo: "INV-002", purchaseDate: "2025-05-10", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  blockCredit: "No",  notes: "Inter-state" },
+    { invoiceNo: "INV-003", purchaseDate: "2025-06-01", supplier: "Auto World",      gstin: "27CCCCC3333C3Z3", assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "common",  blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
+    { invoiceNo: "INV-004", purchaseDate: "2025-07-22", supplier: "Office Supplies", gstin: "",                assetName: "Air Conditioner", taxableValue: 75000,  igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "taxable", blockCredit: "No",  notes: "" },
   ];
   samples.forEach((s, i) => {
     const rr = 2 + i;
@@ -566,6 +569,7 @@ export async function downloadImportTemplate() {
     ["Invoice Number",  "Optional", "Supplier's invoice number (free text). Leave blank if unknown."],
     ["Purchase Date",   "REQUIRED", "Use YYYY-MM-DD (e.g. 2025-04-15). Excel date cells are also accepted."],
     ["Supplier",        "Optional", "Vendor / party name. Aliases accepted: Party, Vendor, Seller."],
+    ["Supplier GSTIN",  "Optional", "GSTIN of the supplier (15-character alphanumeric uppercase standard format)."],
     ["Asset",           "Optional", "Description of the capital good. Aliases accepted: Machine, Product, Item, Description."],
     ["Taxable Value",   "REQUIRED", "Value before GST, in rupees. Numbers only (commas / ₹ are stripped automatically)."],
     ["IGST Rate",       "Optional", "Inter-state purchases. Use a percentage number (e.g. 18). If using IGST, set CGST=0 and SGST=0."],

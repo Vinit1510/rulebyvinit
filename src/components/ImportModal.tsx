@@ -18,6 +18,7 @@ interface Props {
 interface ParsedRow {
   invoiceNo?: string;
   supplier?: string;
+  gstin?: string;
   assetName?: string;
   purchaseDate?: string;
   taxableValue?: number;
@@ -47,6 +48,11 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   "vendor": "supplier",
   "vendor name": "supplier",
   "seller": "supplier",
+  "gstin": "gstin",
+  "gst number": "gstin",
+  "gst no": "gstin",
+  "supplier gstin": "gstin",
+  "supplier gst": "gstin",
   "asset": "assetName",
   "asset name": "assetName",
   "asset description": "assetName",
@@ -192,6 +198,7 @@ function rowToInvoice(row: ParsedRow): Invoice {
     ...base,
     invoiceNo: row.invoiceNo ?? "",
     supplier: row.supplier ?? "",
+    gstin: row.gstin ? row.gstin.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) : "",
     assetName: row.assetName ?? "",
     purchaseDate: row.purchaseDate ?? "",
     taxableValue: row.taxableValue ?? 0,
@@ -381,7 +388,7 @@ export function ImportModal({ open, onClose, onImport }: Props) {
           <div className="text-xs text-muted-foreground space-y-1">
             <p>Upload a CSV or Excel (.xlsx / .xls) file with your capital goods invoices.</p>
             <p>Required columns: <strong>Taxable Value</strong>, <strong>Purchase Date</strong></p>
-            <p>Optional: Invoice Number, Supplier, Asset Description, <strong>IGST/CGST/SGST Rate</strong>, Usage, <strong>Block Credit</strong> (Yes/No), Notes</p>
+            <p>Optional: Invoice Number, Supplier, Supplier GSTIN, Asset Description, <strong>IGST/CGST/SGST Rate</strong>, Usage, <strong>Block Credit</strong> (Yes/No), Notes</p>
           </div>
 
           <div
@@ -439,7 +446,7 @@ export function ImportModal({ open, onClose, onImport }: Props) {
 
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">Column name examples (case-insensitive):</p>
-            <p>Invoice Number, Supplier Name, Asset Description, Purchase Date, Taxable Value</p>
+            <p>Invoice Number, Supplier Name, Supplier GSTIN, Asset Description, Purchase Date, Taxable Value</p>
             <p>For tax: <strong>IGST Rate</strong> + <strong>CGST Rate</strong> + <strong>SGST Rate</strong> — or — <strong>GST Rate</strong> (treated as IGST)</p>
             <p>Usage Type: taxable / exempt / common</p>
           </div>

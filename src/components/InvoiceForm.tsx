@@ -174,6 +174,15 @@ export function InvoiceForm({ open, initial, onClose, onSave }: Props) {
             <Field label="Supplier name">
               <Input value={inv.supplier} onChange={(e) => update({ supplier: e.target.value })} placeholder="Supplier Pvt Ltd" />
             </Field>
+            <Field label="Supplier GSTIN">
+              <Input
+                value={inv.gstin ?? ""}
+                onChange={(e) => update({ gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) })}
+                placeholder="27AAAAA1111A1Z1"
+                maxLength={15}
+                className="uppercase font-mono"
+              />
+            </Field>
             <Field label="Asset description">
               <Input value={inv.assetName} onChange={(e) => update({ assetName: e.target.value })} placeholder="e.g. CNC Machine" />
             </Field>

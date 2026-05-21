@@ -261,6 +261,7 @@ export function exportInvoicePdf(opts: {
 export function exportRegisterPdf(opts: {
   rows: Array<{
     invoiceNo: string; date: string; asset: string; supplier: string;
+    gstin?: string;
     taxableValue: number; netItc: number; igstRev: number; cgstRev: number; sgstRev: number;
     retained: number; status: string;
   }>;
@@ -276,10 +277,10 @@ export function exportRegisterPdf(opts: {
 
   autoTable(doc, {
     startY: 50,
-    head: [["Invoice", "Date", "Asset / Supplier", "Taxable Value", "Net ITC",
+    head: [["Invoice", "Date", "Asset / Supplier", "GSTIN", "Taxable Value", "Net ITC",
       "IGST Rev", "CGST Rev", "SGST Rev", "Retained", "Status"]],
     body: opts.rows.map((r) => [
-      r.invoiceNo || "—", r.date || "—", `${r.asset}\n${r.supplier}`,
+      r.invoiceNo || "—", r.date || "—", `${r.asset}\n${r.supplier}`, r.gstin || "—",
       fmt(r.taxableValue), fmt(r.netItc),
       fmt(r.igstRev), fmt(r.cgstRev), fmt(r.sgstRev),
       fmt(r.retained), r.status,
@@ -288,9 +289,9 @@ export function exportRegisterPdf(opts: {
     headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
     bodyStyles: { fontSize: 8 },
     columnStyles: {
-      3: { halign: "right" }, 4: { halign: "right", fontStyle: "bold" },
-      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
-      8: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
+      4: { halign: "right" }, 5: { halign: "right", fontStyle: "bold" },
+      6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" },
+      9: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
     },
     margin: { left: 24, right: 24 },
   });
