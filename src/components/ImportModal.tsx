@@ -303,25 +303,40 @@ async function parseFile(file: File): Promise<{ invoices: Invoice[]; skipped: nu
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      // Try every sheet — pick the first one that has a detectable header row + at least one data row
+      let fallbackResult = { invoices: [] as Invoice[], skipped: 0 };
+      
+      // Try every sheet to find the correct data sheet
       for (const name of wb.SheetNames) {
         const ws = wb.Sheets[name];
-        // Read as array-of-arrays so we can detect title rows above the actual headers
         const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "", blankrows: false }) as unknown[][];
         if (aoa.length === 0) continue;
         const headerRow = detectHeaderRow(aoa);
         const headers = (aoa[headerRow] ?? []).map((c) => cellToString(c));
-        // Build row objects from rows below the header
+        
+        // Skip legend/reference sheets that match zero known invoice headers
+        let knownHeadersCount = 0;
+        headers.forEach((h) => {
+          const norm = normalizeHeader(h);
+          if (FIELD_ALIASES[norm]) knownHeadersCount++;
+        });
+        if (knownHeadersCount === 0) continue;
+
         const dataRows = aoa.slice(headerRow + 1);
         const rawRows: Record<string, unknown>[] = dataRows.map((r) => {
           const obj: Record<string, unknown> = {};
           headers.forEach((h, i) => { if (h) obj[h] = r[i]; });
           return obj;
         }).filter((obj) => Object.values(obj).some((v) => cellToString(v) !== ""));
+        
         const result = parseRawRows(rawRows as Record<string, string>[]);
-        if (result.invoices.length > 0 || result.skipped > 0) return result;
+        if (result.invoices.length > 0) {
+          return result;
+        }
+        if (result.skipped > fallbackResult.skipped) {
+          fallbackResult = result;
+        }
       }
-      return { invoices: [], skipped: 0 };
+      return fallbackResult;
     } catch (e) {
       return { invoices: [], skipped: 0, error: String(e) };
     }
