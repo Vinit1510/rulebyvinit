@@ -175,6 +175,16 @@ function parseUsage(v: string): UsageType {
 function parseDate(v: string): string {
   if (!v) return "";
   const s = v.trim();
+
+  // Match dd-mm-yyyy, dd/mm/yyyy, or dd.mm.yyyy
+  const ddmmyyyyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = ddmmyyyyMatch[1].padStart(2, "0");
+    const month = ddmmyyyyMatch[2].padStart(2, "0");
+    const year = ddmmyyyyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
@@ -447,6 +457,7 @@ export function ImportModal({ open, onClose, onImport }: Props) {
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">Column name examples (case-insensitive):</p>
             <p>Invoice Number, Supplier Name, Supplier GSTIN, Asset Description, Purchase Date, Taxable Value</p>
+            <p>Date format: <strong>DD-MM-YYYY</strong> (e.g. 15-04-2025)</p>
             <p>For tax: <strong>IGST Rate</strong> + <strong>CGST Rate</strong> + <strong>SGST Rate</strong> — or — <strong>GST Rate</strong> (treated as IGST)</p>
             <p>Usage Type: taxable / exempt / common</p>
           </div>

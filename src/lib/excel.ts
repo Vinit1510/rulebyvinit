@@ -504,7 +504,50 @@ export async function downloadImportTemplate() {
   wb.creator = "Rule 43 ITC Calculator";
   wb.created = new Date();
 
-  // ---- Sheet 1: Invoices (the actual template) ----
+  // ---- Sheet 1: Field Reference (guidance only — now first!) ----
+  const legend = wb.addWorksheet("Field Reference");
+  legend.columns = [{ width: 22 }, { width: 16 }, { width: 78 }];
+  legend.mergeCells("A1:C1");
+  const lt = legend.getCell("A1");
+  lt.value = "FIELD REFERENCE — Rule 43 ITC Import Template";
+  applyTitleRow(lt);
+  legend.getRow(1).height = 26;
+
+  ["Field", "Required?", "Description / accepted values"].forEach((h, i) => {
+    const c = legend.getCell(2, i + 1); c.value = h; applyHeader(c);
+  });
+  legend.getRow(2).height = 24;
+
+  const notes: Array<[string, string, string]> = [
+    ["Invoice Number",  "Optional", "Supplier's invoice number (free text). Leave blank if unknown."],
+    ["Purchase Date",   "REQUIRED", "Use DD-MM-YYYY format (e.g. 15-04-2025). Excel date cells are also accepted."],
+    ["Supplier",        "Optional", "Vendor / party name. Aliases accepted: Party, Vendor, Seller."],
+    ["Supplier GSTIN",  "Optional", "GSTIN of the supplier (15-character alphanumeric uppercase standard format)."],
+    ["Asset",           "Optional", "Description of the capital good. Aliases accepted: Machine, Product, Item, Description."],
+    ["Taxable Value",   "REQUIRED", "Value before GST, in rupees. Numbers only (commas / ₹ are stripped automatically)."],
+    ["IGST Rate",       "Optional", "Inter-state purchases. Use a percentage number (e.g. 18). If using IGST, set CGST=0 and SGST=0."],
+    ["CGST Rate",       "Optional", "Intra-state purchases (Central GST). Typically half of the total GST."],
+    ["SGST Rate",       "Optional", "Intra-state purchases (State / UT GST). The other half. If using CGST+SGST, set IGST=0."],
+    ["Usage",           "Optional", 'Either "common" (mixed taxable + exempt — Rule 43 applies), "taxable" (full ITC, no reversal), or "exempt" (no ITC). Default = common.'],
+    ["Block Credit",    "Optional", 'Yes/No. Set "Yes" for Section 17(5) ineligible credit (motor vehicles, food, club memberships, etc.).'],
+    ["Notes",           "Optional", "Any additional remarks."],
+  ];
+  notes.forEach(([k, req, v], i) => {
+    const r = 3 + i;
+    const a = legend.getCell(r, 1); a.value = k; applySubhead(a);
+    const b = legend.getCell(r, 2); b.value = req;
+    if (req === "REQUIRED") {
+      b.font = { bold: true, color: { argb: "FFEF4444" } }; // red text
+    } else {
+      b.font = { color: { argb: "FF6B7280" } }; // grey text
+    }
+    b.alignment = { horizontal: "center" };
+    const c = legend.getCell(r, 3); c.value = v; c.alignment = { wrapText: true };
+    applyZebra(legend.getRow(r), i % 2 === 1);
+    rowBorders(legend, r, 3);
+  });
+
+  // ---- Sheet 2: Invoices (the actual template — now second!) ----
   const ws = wb.addWorksheet("Invoices", { views: [{ state: "frozen", ySplit: 1 }] });
   const cols = [
     { header: "Invoice Number",   key: "invoiceNo",     width: 18 },
@@ -531,10 +574,10 @@ export async function downloadImportTemplate() {
   ws.getRow(1).height = 30;
 
   const samples: Array<Record<string, string | number>> = [
-    { invoiceNo: "INV-001", purchaseDate: "2025-04-15", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  blockCredit: "No",  notes: "" },
-    { invoiceNo: "INV-002", purchaseDate: "2025-05-10", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  blockCredit: "No",  notes: "Inter-state" },
-    { invoiceNo: "INV-003", purchaseDate: "2025-06-01", supplier: "Auto World",      gstin: "27CCCCC3333C3Z3", assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "common",  blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
-    { invoiceNo: "INV-004", purchaseDate: "2025-07-22", supplier: "Office Supplies", gstin: "",                assetName: "Air Conditioner", taxableValue: 75000,  igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "taxable", blockCredit: "No",  notes: "" },
+    { invoiceNo: "INV-001", purchaseDate: "15-04-2025", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  blockCredit: "No",  notes: "" },
+    { invoiceNo: "INV-002", purchaseDate: "10-05-2025", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  blockCredit: "No",  notes: "Inter-state" },
+    { invoiceNo: "INV-003", purchaseDate: "01-06-2025", supplier: "Auto World",      gstin: "27CCCCC3333C3Z3", assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "common",  blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
+    { invoiceNo: "INV-004", purchaseDate: "22-07-2025", supplier: "Office Supplies", gstin: "",                assetName: "Air Conditioner", taxableValue: 75000,  igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "taxable", blockCredit: "No",  notes: "" },
   ];
   samples.forEach((s, i) => {
     const rr = 2 + i;
@@ -549,48 +592,6 @@ export async function downloadImportTemplate() {
     });
     applyZebra(ws.getRow(rr), i % 2 === 1);
     rowBorders(ws, rr, cols.length);
-  });
-
-  // ---- Sheet 2: Field Reference (guidance only — never required for parsing) ----
-  const legend = wb.addWorksheet("Field Reference");
-  legend.columns = [{ width: 22 }, { width: 16 }, { width: 78 }];
-  legend.mergeCells("A1:C1");
-  const lt = legend.getCell("A1");
-  lt.value = "FIELD REFERENCE — Rule 43 ITC Import Template";
-  applyTitleRow(lt);
-  legend.getRow(1).height = 26;
-
-  ["Field", "Required?", "Description / accepted values"].forEach((h, i) => {
-    const c = legend.getCell(2, i + 1); c.value = h; applyHeader(c);
-  });
-  legend.getRow(2).height = 24;
-
-  const notes: Array<[string, string, string]> = [
-    ["Invoice Number",  "Optional", "Supplier's invoice number (free text). Leave blank if unknown."],
-    ["Purchase Date",   "REQUIRED", "Use YYYY-MM-DD (e.g. 2025-04-15). Excel date cells are also accepted."],
-    ["Supplier",        "Optional", "Vendor / party name. Aliases accepted: Party, Vendor, Seller."],
-    ["Supplier GSTIN",  "Optional", "GSTIN of the supplier (15-character alphanumeric uppercase standard format)."],
-    ["Asset",           "Optional", "Description of the capital good. Aliases accepted: Machine, Product, Item, Description."],
-    ["Taxable Value",   "REQUIRED", "Value before GST, in rupees. Numbers only (commas / ₹ are stripped automatically)."],
-    ["IGST Rate",       "Optional", "Inter-state purchases. Use a percentage number (e.g. 18). If using IGST, set CGST=0 and SGST=0."],
-    ["CGST Rate",       "Optional", "Intra-state purchases (Central GST). Typically half of the total GST."],
-    ["SGST Rate",       "Optional", "Intra-state purchases (State / UT GST). The other half. If using CGST+SGST, set IGST=0."],
-    ["Usage",           "Optional", 'Either "common" (mixed taxable + exempt — Rule 43 applies), "taxable" (full ITC, no reversal), or "exempt" (no ITC). Default = common.'],
-    ["Block Credit",    "Optional", 'Yes/No. Set "Yes" for Section 17(5) ineligible credit (motor vehicles, food, club memberships, etc.).'],
-    ["Notes",           "Optional", "Any additional remarks."],
-  ];
-  notes.forEach(([k, req, v], i) => {
-    const r = 3 + i;
-    const a = legend.getCell(r, 1); a.value = k; applySubhead(a);
-    const b = legend.getCell(r, 2); b.value = req;
-    b.alignment = { horizontal: "center", vertical: "middle" };
-    b.font = { bold: true, color: { argb: req === "REQUIRED" ? "FFB91C1C" : "FF6B7280" } };
-    const c = legend.getCell(r, 3); c.value = v;
-    c.alignment = { wrapText: true, vertical: "middle" };
-    if (i % 2 === 1) {
-      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ROW_ALT } };
-    }
-    rowBorders(legend, r, 3);
   });
 
   // Tip row
