@@ -316,17 +316,7 @@ function MainApp() {
             <AnimatePresence mode="wait">
               <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
                 {activeTab === "/dashboard" && (
-                  <DashboardView
-                    invoices={calc.state.invoices}
-                    turnover={calc.state.turnover}
-                    onNavigate={setLocation}
-                    onAddInvoice={() => {
-                      setLocation("/invoices");
-                    }}
-                    onImport={() => {
-                      setLocation("/invoices");
-                    }}
-                  />
+                  <DashboardView onNavigate={setLocation} />
                 )}
                 {activeTab === "/invoices" && (
                   <InvoiceRegister
