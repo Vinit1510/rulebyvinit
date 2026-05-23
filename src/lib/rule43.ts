@@ -705,9 +705,9 @@ export function computeRule42Month(
   };
 
   const totalReversal = {
-    igst: d1.igst + d2.igst,
-    cgst: d1.cgst + d2.cgst,
-    sgst: d1.sgst + d2.sgst,
+    igst: t1.igst + t2.igst + t3.igst + d1.igst + d2.igst,
+    cgst: t1.cgst + t2.cgst + t3.cgst + d1.cgst + d2.cgst,
+    sgst: t1.sgst + t2.sgst + t3.sgst + d1.sgst + d2.sgst,
   };
 
   return {
@@ -835,9 +835,9 @@ export function reconcileRule42Annual(
   };
 
   const requiredTotalReversal = {
-    igst: requiredD1.igst + requiredD2.igst,
-    cgst: requiredD1.cgst + requiredD2.cgst,
-    sgst: requiredD1.sgst + requiredD2.sgst,
+    igst: annualT1.igst + annualT2.igst + annualT3.igst + requiredD1.igst + requiredD2.igst,
+    cgst: annualT1.cgst + annualT2.cgst + annualT3.cgst + requiredD1.cgst + requiredD2.cgst,
+    sgst: annualT1.sgst + annualT2.sgst + annualT3.sgst + requiredD1.sgst + requiredD2.sgst,
   };
 
   const variance = {
