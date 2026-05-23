@@ -16,12 +16,18 @@ import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown } fr
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
+  type GstAmounts, type Rule42MonthResult, type Rule42AnnualReconciliation,
+  computeRule42Month, reconcileRule42Annual,
 } from "@/lib/rule43";
 import {
   exportRule43Xlsx, exportInvoiceXlsx, exportRegisterXlsx, exportBlockedCreditXlsx,
+  exportRule42Xlsx, exportRule42ReconXlsx,
   periodLabel, type DetailedRow, type BlockedRow,
 } from "@/lib/excel";
-import { exportRule43Pdf, exportInvoicePdf, exportRegisterPdf, exportBlockedCreditPdf } from "@/lib/pdf";
+import {
+  exportRule43Pdf, exportInvoicePdf, exportRegisterPdf, exportBlockedCreditPdf,
+  exportRule42Pdf, exportRule42ReconPdf
+} from "@/lib/pdf";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -106,8 +112,441 @@ function filterEndDate(f: ReportFilter): Date {
   return new Date(8640000000000000);
 }
 
+function Rule42MonthlyReport({
+  invoices, turnover, filter, setFilter,
+}: {
+  invoices: Invoice[];
+  turnover: Record<string, MonthlyTurnover>;
+  filter: ReportFilter;
+  setFilter: (f: ReportFilter) => void;
+}) {
+  const allMonths = useMemo(() => {
+    const set = new Map<string, Date>();
+    for (const inv of invoices) {
+      if ((inv.itemType ?? "capital_good") === "capital_good") continue;
+      if (!inv.purchaseDate) continue;
+      const d = new Date(inv.purchaseDate);
+      if (!isNaN(d.getTime())) {
+        const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        set.set(mk, new Date(d.getFullYear(), d.getMonth(), 1));
+      }
+    }
+    for (const k of Object.keys(turnover)) {
+      const [y, m] = k.split("-").map(Number);
+      if (y && m) set.set(k, new Date(y, m - 1, 1));
+    }
+    return Array.from(set.values()).sort((a, b) => a.getTime() - b.getTime());
+  }, [invoices, turnover]);
+
+  const rows = useMemo(() => {
+    return allMonths
+      .filter((d) => inFilter(d, filter))
+      .map((d) => {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const t = turnover[key] ?? { exempt: 0, taxable: 0 };
+        return computeRule42Month(invoices, key, t);
+      });
+  }, [allMonths, invoices, turnover, filter]);
+
+  const availableYears = useMemo(() => {
+    const ys = new Set<number>();
+    for (const d of allMonths) ys.add(fyStartYear(d));
+    if (ys.size === 0) ys.add(fyStartYear(new Date()));
+    return Array.from(ys).sort((a, b) => a - b);
+  }, [allMonths]);
+
+  // Aggregate totals across months in the filter
+  const totT = { igst: 0, cgst: 0, sgst: 0 };
+  const totT1 = { igst: 0, cgst: 0, sgst: 0 };
+  const totT2 = { igst: 0, cgst: 0, sgst: 0 };
+  const totT3 = { igst: 0, cgst: 0, sgst: 0 };
+  const totC1 = { igst: 0, cgst: 0, sgst: 0 };
+  const totT4 = { igst: 0, cgst: 0, sgst: 0 };
+  const totC2 = { igst: 0, cgst: 0, sgst: 0 };
+  const totD1 = { igst: 0, cgst: 0, sgst: 0 };
+  const totD2 = { igst: 0, cgst: 0, sgst: 0 };
+  const totC3 = { igst: 0, cgst: 0, sgst: 0 };
+  const totEligible = { igst: 0, cgst: 0, sgst: 0 };
+  const totReversal = { igst: 0, cgst: 0, sgst: 0 };
+
+  for (const r of rows) {
+    for (const c of ["igst", "cgst", "sgst"] as const) {
+      totT[c] += r.totalItc[c];
+      totT1[c] += r.t1[c];
+      totT2[c] += r.t2[c];
+      totT3[c] += r.t3[c];
+      totC1[c] += r.c1[c];
+      totT4[c] += r.t4[c];
+      totC2[c] += r.c2[c];
+      totD1[c] += r.d1[c];
+      totD2[c] += r.d2[c];
+      totC3[c] += r.c3[c];
+      totEligible[c] += r.eligibleItc[c];
+      totReversal[c] += r.totalReversal[c];
+    }
+  }
+
+  const sumT = totT.igst + totT.cgst + totT.sgst;
+  const sumReversal = totReversal.igst + totReversal.cgst + totReversal.sgst;
+  const sumEligible = totEligible.igst + totEligible.cgst + totEligible.sgst;
+
+  const handlePdf = () => {
+    const filename = `Rule-42-Apportionment-${filterFilenameSuffix(filter)}.pdf`;
+    exportRule42Pdf({
+      filterTitle: filterTitle(filter),
+      totalT: sumT,
+      totalReversal: sumReversal,
+      totalEligible: sumEligible,
+      rows: rows,
+    }, filename);
+  };
+
+  const handleExcel = () => {
+    const filename = `Rule-42-Apportionment-${filterFilenameSuffix(filter)}.xlsx`;
+    exportRule42Xlsx({
+      filterTitle: filterTitle(filter),
+      totalT: sumT,
+      totalReversal: sumReversal,
+      totalEligible: sumEligible,
+      rows: rows,
+    }, filename);
+  };
+
+  return (
+    <div className="space-y-5">
+      <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
+
+      {/* Summary totals block */}
+      <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="py-4">
+            <div className="text-xs text-muted-foreground">Total Inward ITC (T)</div>
+            <div className="num text-xl font-bold text-primary mt-1">{formatINR(sumT)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+              <span>I:{formatINR(totT.igst)}</span>
+              <span>C:{formatINR(totT.cgst)}</span>
+              <span>S:{formatINR(totT.sgst)}</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-destructive/5 border-destructive/20">
+          <CardContent className="py-4">
+            <div className="text-xs text-muted-foreground">Total ITC Reversal (D1 + D2)</div>
+            <div className="num text-xl font-bold text-destructive mt-1">{formatINR(sumReversal)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+              <span>I:{formatINR(totReversal.igst)}</span>
+              <span>C:{formatINR(totReversal.cgst)}</span>
+              <span>S:{formatINR(totReversal.sgst)}</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-green-500/5 border-green-500/20 dark:bg-green-950/10">
+          <CardContent className="py-4">
+            <div className="text-xs text-muted-foreground">Net Eligible ITC Claimed</div>
+            <div className="num text-xl font-bold text-green-700 dark:text-green-400 mt-1">{formatINR(sumEligible)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+              <span>I:{formatINR(totEligible.igst)}</span>
+              <span>C:{formatINR(totEligible.cgst)}</span>
+              <span>S:{formatINR(totEligible.sgst)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Apportionment breakdown table */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
+          <div>
+            <CardTitle className="text-base">Rule 42 Apportionment Schedule</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">Monthly calculations on Inputs &amp; Input Services</p>
+          </div>
+          <div className="flex gap-2 no-print">
+            <Button variant="outline" size="sm" onClick={handleExcel}><Download className="h-3.5 w-3.5 mr-1.5" />Excel</Button>
+            <Button variant="outline" size="sm" onClick={handlePdf}><Printer className="h-3.5 w-3.5 mr-1.5" />PDF</Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto w-full">
+            <Table className="min-w-[1200px]">
+              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
+                <TableRow>
+                  <TableHead className="w-[110px]">Month</TableHead>
+                  <TableHead className="text-right">Total ITC (T)</TableHead>
+                  <TableHead className="text-right text-destructive">Non-Bus (T1)</TableHead>
+                  <TableHead className="text-right text-destructive">Exempt (T2)</TableHead>
+                  <TableHead className="text-right text-destructive">Blocked (T3)</TableHead>
+                  <TableHead className="text-right font-medium">Ledger (C1)</TableHead>
+                  <TableHead className="text-right text-green-600">Taxable (T4)</TableHead>
+                  <TableHead className="text-right font-medium">Common (C2)</TableHead>
+                  <TableHead className="text-right">Ratio (E/F)</TableHead>
+                  <TableHead className="text-right text-destructive bg-destructive/5">Exempt Rev (D1)</TableHead>
+                  <TableHead className="text-right text-destructive bg-destructive/5">Non-Bus Rev (D2)</TableHead>
+                  <TableHead className="text-right text-green-600 font-semibold bg-green-500/5">Net Eligible</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="py-12 text-center text-sm text-muted-foreground italic">
+                      No Inputs &amp; Services found in this reporting window.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r) => {
+                    const tVal = r.totalItc.igst + r.totalItc.cgst + r.totalItc.sgst;
+                    const t1Val = r.t1.igst + r.t1.cgst + r.t1.sgst;
+                    const t2Val = r.t2.igst + r.t2.cgst + r.t2.sgst;
+                    const t3Val = r.t3.igst + r.t3.cgst + r.t3.sgst;
+                    const c1Val = r.c1.igst + r.c1.cgst + r.c1.sgst;
+                    const t4Val = r.t4.igst + r.t4.cgst + r.t4.sgst;
+                    const c2Val = r.c2.igst + r.c2.cgst + r.c2.sgst;
+                    const d1Val = r.d1.igst + r.d1.cgst + r.d1.sgst;
+                    const d2Val = r.d2.igst + r.d2.cgst + r.d2.sgst;
+                    const eligVal = r.eligibleItc.igst + r.eligibleItc.cgst + r.eligibleItc.sgst;
+
+                    return (
+                      <TableRow key={r.monthKey} className="hover:bg-muted/40 text-xs">
+                        <TableCell className="font-medium">{r.monthLabel}</TableCell>
+                        <TableCell className="text-right num font-semibold">{formatINR(tVal)}</TableCell>
+                        <TableCell className="text-right num text-destructive">{t1Val > 0 ? formatINR(t1Val) : "—"}</TableCell>
+                        <TableCell className="text-right num text-destructive">{t2Val > 0 ? formatINR(t2Val) : "—"}</TableCell>
+                        <TableCell className="text-right num text-destructive">{t3Val > 0 ? formatINR(t3Val) : "—"}</TableCell>
+                        <TableCell className="text-right num font-medium">{formatINR(c1Val)}</TableCell>
+                        <TableCell className="text-right num text-green-700 dark:text-green-400">{t4Val > 0 ? formatINR(t4Val) : "—"}</TableCell>
+                        <TableCell className="text-right num font-medium">{formatINR(c2Val)}</TableCell>
+                        <TableCell className="text-right num">{(r.exemptRatio * 100).toFixed(1)}%</TableCell>
+                        <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d1Val)}</TableCell>
+                        <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d2Val)}</TableCell>
+                        <TableCell className="text-right num text-green-700 dark:text-green-400 bg-green-500/5 font-bold text-sm">{formatINRPrecise(eligVal)}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Rule42AnnualReconciliationReport({
+  invoices, turnover,
+}: {
+  invoices: Invoice[];
+  turnover: Record<string, MonthlyTurnover>;
+}) {
+  const allMonths = useMemo(() => {
+    const set = new Map<string, Date>();
+    for (const inv of invoices) {
+      if ((inv.itemType ?? "capital_good") === "capital_good") continue;
+      if (!inv.purchaseDate) continue;
+      const d = new Date(inv.purchaseDate);
+      if (!isNaN(d.getTime())) {
+        const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        set.set(mk, new Date(d.getFullYear(), d.getMonth(), 1));
+      }
+    }
+    return Array.from(set.values()).sort((a, b) => a.getTime() - b.getTime());
+  }, [invoices]);
+
+  const availableYears = useMemo(() => {
+    const ys = new Set<number>();
+    for (const d of allMonths) ys.add(fyStartYear(d));
+    if (ys.size === 0) ys.add(fyStartYear(new Date()));
+    return Array.from(ys).sort((a, b) => a - b);
+  }, [allMonths]);
+
+  const [selectedFy, setSelectedFy] = useState<number>(() => {
+    return availableYears[availableYears.length - 1] ?? fyStartYear(new Date());
+  });
+
+  const recon = useMemo(() => {
+    return reconcileRule42Annual(invoices, turnover, selectedFy);
+  }, [invoices, turnover, selectedFy]);
+
+  const sumC2 = recon.annualC2.igst + recon.annualC2.cgst + recon.annualC2.sgst;
+  const sumReqD1 = recon.requiredD1.igst + recon.requiredD1.cgst + recon.requiredD1.sgst;
+  const sumReqD2 = recon.requiredD2.igst + recon.requiredD2.cgst + recon.requiredD2.sgst;
+  const sumReqReversal = recon.requiredTotalReversal.igst + recon.requiredTotalReversal.cgst + recon.requiredTotalReversal.sgst;
+  const sumActualReversed = recon.sumMonthlyReversed.igst + recon.sumMonthlyReversed.cgst + recon.sumMonthlyReversed.sgst;
+  const sumVariance = recon.variance.igst + recon.variance.cgst + recon.variance.sgst;
+
+  const isShortfall = sumVariance > 0.01;
+  const isRefund = sumVariance < -0.01;
+
+  const handleExcel = () => {
+    const filename = `Rule-42-Annual-Reconciliation-FY-${recon.fyLabel}.xlsx`;
+    exportRule42ReconXlsx({
+      fyLabel: recon.fyLabel,
+      recon: recon,
+    }, filename);
+  };
+
+  const handlePdf = () => {
+    const filename = `Rule-42-Annual-Reconciliation-FY-${recon.fyLabel}.pdf`;
+    exportRule42ReconPdf({
+      fyLabel: recon.fyLabel,
+      recon: recon,
+    }, filename);
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card className="no-print">
+        <CardContent className="py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground font-semibold">Select Financial Year</span>
+            <Select value={String(selectedFy)} onValueChange={(v) => setSelectedFy(Number(v))}>
+              <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)}>FY {fyLabel(y)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExcel}><Download className="h-3.5 w-3.5 mr-1.5" />Excel</Button>
+            <Button variant="outline" size="sm" onClick={handlePdf}><Printer className="h-3.5 w-3.5 mr-1.5" />PDF</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Variance Alert Panel */}
+      {isShortfall && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="py-5 flex flex-wrap items-start gap-4 justify-between">
+            <div className="flex-1 space-y-1">
+              <h3 className="text-base font-semibold text-destructive flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                Shortfall Identified: Reversal Required (Claw-back)
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                Your aggregate annual exempt ratio is higher than the sum of monthly reversals. 
+                You must **reverse the shortfall of {formatINR(sumVariance)}** in your GSTR-3B return. 
+                Under Section 50(1) of the CGST Act, interest @ 18% p.a. is applicable on this shortfall from 1st April of the next FY until the date of payment.
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Shortfall Amount</span>
+              <div className="num text-2xl font-black text-destructive mt-1">{formatINR(sumVariance)}</div>
+              <span className="text-[10px] text-destructive-foreground/70 bg-destructive/10 px-2 py-0.5 border rounded-full mt-2 inline-block font-semibold">Payable with 18% Interest</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isRefund && (
+        <Card className="border-green-500/40 bg-green-50/40 dark:bg-green-950/5">
+          <CardContent className="py-5 flex flex-wrap items-start gap-4 justify-between">
+            <div className="flex-1 space-y-1">
+              <h3 className="text-base font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                <Check className="h-5 w-5 shrink-0 bg-green-100 dark:bg-green-900 rounded-full p-0.5" />
+                Excess Reversals Identified: ITC Reclaimable
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                Your monthly reversals exceeded the required annual aggregate. 
+                You are **eligible to reclaim {formatINR(Math.abs(sumVariance))}** as input tax credit in any GSTR-3B return filed up to September of the following financial year.
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Reclaimable ITC</span>
+              <div className="num text-2xl font-black text-green-700 dark:text-green-400 mt-1">{formatINR(Math.abs(sumVariance))}</div>
+              <span className="text-[10px] text-green-700 dark:text-green-400 bg-green-500/10 px-2 py-0.5 border rounded-full mt-2 inline-block font-semibold">Reclaim in GSTR-3B Table 4(A)(5)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Core Reconciliation Card */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Annual Apportionment Recalculation (Rule 42(2))</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          {/* Component-wise breakdown table */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead>Calculation Item</TableHead>
+                  <TableHead className="text-right w-[150px]">IGST (₹)</TableHead>
+                  <TableHead className="text-right w-[150px]">CGST (₹)</TableHead>
+                  <TableHead className="text-right w-[150px]">SGST (₹)</TableHead>
+                  <TableHead className="text-right w-[180px] font-bold">Total (₹)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow className="hover:bg-muted/40 text-xs">
+                  <TableCell className="font-medium">Annual Common Credit (C2)</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.sgst)}</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINRPrecise(sumC2)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 text-xs">
+                  <TableCell className="font-medium">Annual Exempt Supplies Turnover (E)</TableCell>
+                  <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Exempt Turnover</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINR(recon.annualExemptTurnover)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 text-xs">
+                  <TableCell className="font-medium">Annual Total supplies Turnover (F)</TableCell>
+                  <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Total Turnover</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINR(recon.annualTotalTurnover)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 text-xs">
+                  <TableCell className="font-medium text-primary">Annual Exempt turnover Ratio (E/F)</TableCell>
+                  <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Ratio</TableCell>
+                  <TableCell className="text-right num font-semibold text-primary">{(recon.annualExemptRatio * 100).toFixed(2)}%</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 text-destructive bg-destructive/5 text-xs">
+                  <TableCell className="font-medium text-destructive">Annual Required Exempt Reversal (D1)</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.sgst)}</TableCell>
+                  <TableCell className="text-right num font-bold">{formatINRPrecise(sumReqD1)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 text-destructive bg-destructive/5 text-xs">
+                  <TableCell className="font-medium text-destructive">Annual Required Personal Reversal (D2 - 5%)</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.sgst)}</TableCell>
+                  <TableCell className="text-right num font-bold">{formatINRPrecise(sumReqD2)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 bg-muted/20 font-semibold border-y text-xs">
+                  <TableCell>Annual Required Total Reversal (D1+D2)</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.sgst)}</TableCell>
+                  <TableCell className="text-right num font-bold text-base">{formatINRPrecise(sumReqReversal)}</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/40 bg-muted/10 text-muted-foreground text-xs">
+                  <TableCell>Actual Monthly Reversals Sum</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.sgst)}</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINRPrecise(sumActualReversed)}</TableCell>
+                </TableRow>
+                <TableRow className={`hover:bg-muted/40 font-black border-t-2 text-xs ${isShortfall ? "text-destructive bg-destructive/5" : "text-green-700 dark:text-green-400 bg-green-500/5"}`}>
+                  <TableCell>Final Reversal Variance (Shortfall / Excess)</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.igst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.cgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.sgst)}</TableCell>
+                  <TableCell className="text-right num font-black text-base">{formatINRPrecise(sumVariance)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ResultsPanel({ invoices, turnover }: Props) {
+  const [reportType, setReportType] = useState<"rule43" | "rule42">("rule43");
   const [view, setView] = useState<string>("consolidated");
+  const [r42View, setR42View] = useState<string>("r42-monthly");
   const [filter, setFilter] = useState<ReportFilter>(() => defaultFilter(invoices));
   const consol = useMemo(() => consolidate(invoices, turnover), [invoices, turnover]);
 
@@ -120,7 +559,7 @@ export function ResultsPanel({ invoices, turnover }: Props) {
           </div>
           <h3 className="text-base font-medium">No invoices yet</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Add capital goods invoices in the <strong>Invoices</strong> tab to generate Rule 43 reports.
+            Add supply invoices in the <strong>Invoices</strong> tab to generate reports.
           </p>
         </CardContent>
       </Card>
@@ -129,33 +568,75 @@ export function ResultsPanel({ invoices, turnover }: Props) {
 
   return (
     <div className="space-y-5 print-page">
-      <Tabs value={view} onValueChange={setView}>
-        <TabsList>
-          <TabsTrigger value="consolidated">Rule 43 — Consolidated</TabsTrigger>
-          <TabsTrigger value="per-invoice">Rule 43 — Per-invoice</TabsTrigger>
-          <TabsTrigger value="register">Rule 43 — Register</TabsTrigger>
-          <TabsTrigger value="block-credit">Sec 17(5) Blocked Credit</TabsTrigger>
-        </TabsList>
+      {/* Top Level Rule Toggle */}
+      <div className="flex bg-muted/40 p-1.5 rounded-xl border gap-2 self-start w-full sm:w-auto no-print">
+        {(["rule43", "rule42"] as const).map((rt) => (
+          <button
+            key={rt}
+            type="button"
+            onClick={() => setReportType(rt)}
+            className={`text-xs px-5 py-2.5 rounded-lg font-semibold transition-all flex-1 sm:flex-none flex items-center gap-2 ${
+              reportType === rt
+                ? "bg-background text-foreground shadow-md border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {rt === "rule43" ? "Rule 43 (Capital Goods)" : "Rule 42 (Inputs & Services)"}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="consolidated" className="mt-4">
-          <ConsolidatedReport
-            consol={consol}
-            invoices={invoices}
-            turnover={turnover}
-            filter={filter}
-            setFilter={setFilter}
-          />
-        </TabsContent>
-        <TabsContent value="per-invoice" className="mt-4">
-          <PerInvoiceReport invoices={invoices} turnover={turnover} />
-        </TabsContent>
-        <TabsContent value="register" className="mt-4">
-          <RegisterSummary invoices={invoices} turnover={turnover} />
-        </TabsContent>
-        <TabsContent value="block-credit" className="mt-4">
-          <BlockCreditReport invoices={invoices} />
-        </TabsContent>
-      </Tabs>
+      {reportType === "rule43" ? (
+        <Tabs value={view} onValueChange={setView}>
+          <TabsList>
+            <TabsTrigger value="consolidated">Rule 43 — Consolidated</TabsTrigger>
+            <TabsTrigger value="per-invoice">Rule 43 — Per-invoice</TabsTrigger>
+            <TabsTrigger value="register">Rule 43 — Register</TabsTrigger>
+            <TabsTrigger value="block-credit">Sec 17(5) Blocked Credit</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="consolidated" className="mt-4">
+            <ConsolidatedReport
+              consol={consol}
+              invoices={invoices}
+              turnover={turnover}
+              filter={filter}
+              setFilter={setFilter}
+            />
+          </TabsContent>
+          <TabsContent value="per-invoice" className="mt-4">
+            <PerInvoiceReport invoices={invoices} turnover={turnover} />
+          </TabsContent>
+          <TabsContent value="register" className="mt-4">
+            <RegisterSummary invoices={invoices} turnover={turnover} />
+          </TabsContent>
+          <TabsContent value="block-credit" className="mt-4">
+            <BlockCreditReport invoices={invoices} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <Tabs value={r42View} onValueChange={setR42View}>
+          <TabsList>
+            <TabsTrigger value="r42-monthly">Rule 42 — Monthly Apportionment</TabsTrigger>
+            <TabsTrigger value="r42-annual">Rule 42 — Annual Reconciliation</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="r42-monthly" className="mt-4">
+            <Rule42MonthlyReport
+              invoices={invoices}
+              turnover={turnover}
+              filter={filter}
+              setFilter={setFilter}
+            />
+          </TabsContent>
+          <TabsContent value="r42-annual" className="mt-4">
+            <Rule42AnnualReconciliationReport
+              invoices={invoices}
+              turnover={turnover}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

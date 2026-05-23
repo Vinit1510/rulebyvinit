@@ -27,14 +27,17 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const totalCount = invoices.length;
-  const totalItc = invoices.reduce((s, inv) => {
-    const { igstItc, cgstItc, sgstItc } = computeItcComponents(inv.taxableValue, inv);
-    return s + igstItc + cgstItc + sgstItc;
-  }, 0);
+  const [typeFilter, setTypeFilter] = useState<"all" | "rule42" | "rule43">("all");
 
   const filteredInvoices = invoices.filter((inv) => {
+    // 1. Filter by item type
+    if (typeFilter === "rule42") {
+      if (inv.itemType === "capital_good") return false;
+    } else if (typeFilter === "rule43") {
+      if (inv.itemType !== "capital_good" && inv.itemType !== undefined) return false;
+    }
+
+    // 2. Filter by search query
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return (
@@ -46,33 +49,70 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
     );
   });
 
+  const totalCount = filteredInvoices.length;
+  const totalItc = filteredInvoices.reduce((s, inv) => {
+    const { igstItc, cgstItc, sgstItc } = computeItcComponents(inv.taxableValue, inv);
+    return s + igstItc + cgstItc + sgstItc;
+  }, 0);
+
+  const titleStr =
+    typeFilter === "all"
+      ? "All Inward Supplies"
+      : typeFilter === "rule42"
+      ? "Inputs & Input Services (Rule 42)"
+      : "Capital Goods Register (Rule 43)";
+
   return (
     <div className="space-y-5">
       <Accordion type="single" collapsible>
         <AccordionItem value="rule43" className="border rounded-lg px-4 bg-muted/30">
-          <AccordionTrigger className="text-sm font-medium">What is Rule 43?</AccordionTrigger>
+          <AccordionTrigger className="text-sm font-medium">What is Rule 42 &amp; Rule 43?</AccordionTrigger>
           <AccordionContent className="text-sm leading-relaxed text-muted-foreground space-y-2">
-            <p>Rule 43 (CGST Rules) governs ITC on capital goods used partly for taxable and partly for exempt supplies. ITC is amortized over 60 months.</p>
-            <p>Each month, the portion attributable to exempt supplies must be reversed in GSTR-3B Table 4(B)(1). IGST, CGST, and SGST reversals are reported separately.</p>
+            <p>
+              <strong>Rule 42:</strong> Governs ITC on inputs and input services. Common credit is reversed monthly based on the exempt turnover ratio plus a fixed 5% personal-use reversal.
+            </p>
+            <p>
+              <strong>Rule 43:</strong> Governs ITC on capital goods. ITC is amortized over 60 months. The portion attributable to exempt supplies is reversed monthly.
+            </p>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Capital Goods Register</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totalCount} invoice{totalCount === 1 ? "" : "s"} · Total ITC <span className="num font-medium text-foreground">{formatINR(totalItc)}</span>
-            </p>
+        <CardHeader className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+            <div>
+              <CardTitle className="text-base">{titleStr}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                {totalCount} item{totalCount === 1 ? "" : "s"} · Total ITC <span className="num font-medium text-foreground">{formatINR(totalItc)}</span>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5 mr-1.5" /> Import
+              </Button>
+              <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add invoice
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="h-3.5 w-3.5 mr-1.5" /> Import
-            </Button>
-            <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add invoice
-            </Button>
+
+          {/* Segmented Filter Tab */}
+          <div className="flex bg-muted/40 p-1 rounded-lg border gap-1 self-start w-full sm:w-auto no-print">
+            {(["all", "rule42", "rule43"] as const).map((tf) => (
+              <button
+                key={tf}
+                type="button"
+                onClick={() => setTypeFilter(tf)}
+                className={`text-xs px-4 py-1.5 rounded-md font-medium transition-all flex-1 sm:flex-none ${
+                  typeFilter === tf
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tf === "all" ? "All Supplies" : tf === "rule42" ? "Rule 42 (Inputs/Services)" : "Rule 43 (Capital Goods)"}
+              </button>
+            ))}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -81,7 +121,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 <FileText className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground">No invoices yet. Add your first capital goods invoice to get started.</p>
+              <p className="text-sm text-muted-foreground">No invoices yet. Add your first supply invoice to get started.</p>
               <Button variant="outline" size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Add invoice
               </Button>
@@ -92,7 +132,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                 <div className="relative max-w-md w-full">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search invoices by number, asset, supplier, GSTIN or notes..."
+                    placeholder="Search invoices by number, item description, supplier, GSTIN or notes..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="h-9 text-xs pl-9 bg-background w-full"
@@ -104,11 +144,11 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Supplier / Asset</TableHead>
+                    <TableHead>Supplier / Item description</TableHead>
                     <TableHead className="text-right">Taxable Value</TableHead>
                     <TableHead className="text-right">GST Type</TableHead>
                     <TableHead className="text-right">ITC (IGST / CGST / SGST)</TableHead>
-                    <TableHead className="text-right">Monthly Tm</TableHead>
+                    <TableHead className="text-right">Monthly Tm (Rule 43)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
@@ -117,11 +157,12 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                   {filteredInvoices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
-                        No invoices match your search query "{searchQuery}".
+                        No inward supplies match your search query "{searchQuery}".
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredInvoices.map((inv) => {
+                      const isCap = inv.itemType === "capital_good" || !inv.itemType;
                       const { igstItc: grossIgst, cgstItc: grossCgst, sgstItc: grossSgst } = computeItcComponents(inv.taxableValue, inv);
                       const grossTc = grossIgst + grossCgst + grossSgst;
                       const cnItc = (inv.creditNotes ?? []).reduce((s, cn) => {
@@ -133,7 +174,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                         return s + igstItc + cgstItc + sgstItc;
                       }, 0);
                       const netTc = Math.max(0, grossTc - cnItc + dnItc);
-                      const tm = netTc / 60;
+                      const tm = isCap ? netTc / 60 : 0;
                       const cnCount = (inv.creditNotes ?? []).length;
                       const dnCount = (inv.debitNotes ?? []).length;
                       const isInterstate = (inv.igstRate || 0) > 0;
@@ -144,7 +185,7 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                           <TableCell className="font-medium text-sm">{inv.invoiceNo || "—"}</TableCell>
                           <TableCell className="text-sm">{inv.purchaseDate || "—"}</TableCell>
                           <TableCell>
-                            <div className="text-sm">{inv.assetName || "—"}</div>
+                            <div className="text-sm font-medium text-foreground">{inv.assetName || "—"}</div>
                             <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span>{inv.supplier || "—"}</span>
                               {inv.gstin && (
@@ -152,6 +193,9 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                                   {inv.gstin}
                                 </span>
                               )}
+                              <Badge variant="secondary" className="text-[9px] py-0 h-4 border">
+                                {inv.itemType === "input" ? "Input" : inv.itemType === "service" ? "Service" : "Capital Good"}
+                              </Badge>
                             </div>
                           </TableCell>
                           <TableCell className="text-right num text-sm">{formatINR(inv.taxableValue)}</TableCell>
@@ -160,16 +204,18 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                             <div className="text-muted-foreground">{isInterstate ? "IGST" : `C${inv.cgstRate}+S${inv.sgstRate}`}</div>
                           </TableCell>
                           <TableCell className="text-right num text-sm font-medium">
-                            <div>{formatINR(netTc)}</div>
+                            <div>{formatINR(isCap ? netTc : grossTc)}</div>
                             <div className="text-[10px] text-muted-foreground leading-tight">
                               {grossIgst > 0 && <span>I:{formatINR(grossIgst)} </span>}
                               {grossCgst > 0 && <span>C:{formatINR(grossCgst)} </span>}
                               {grossSgst > 0 && <span>S:{formatINR(grossSgst)}</span>}
                             </div>
-                            {cnCount > 0 && <div className="text-[10px] text-destructive">−{formatINR(cnItc)} CN</div>}
-                            {dnCount > 0 && <div className="text-[10px] text-green-600 dark:text-green-400">+{formatINR(dnItc)} DN</div>}
+                            {isCap && cnCount > 0 && <div className="text-[10px] text-destructive">−{formatINR(cnItc)} CN</div>}
+                            {isCap && dnCount > 0 && <div className="text-[10px] text-green-600 dark:text-green-400">+{formatINR(dnItc)} DN</div>}
                           </TableCell>
-                          <TableCell className="text-right num text-sm">{formatINR(tm)}</TableCell>
+                          <TableCell className="text-right num text-sm">
+                            {isCap ? formatINR(tm) : <span className="text-muted-foreground italic text-xs">Rule 42 (N/A)</span>}
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="outline" className="text-[10px] capitalize">{inv.usage}</Badge>

@@ -386,3 +386,243 @@ export function exportBlockedCreditPdf(opts: {
 
   doc.save(filename);
 }
+
+export interface Rule42PdfMonth {
+  monthLabel: string;
+  totalItc: { igst: number; cgst: number; sgst: number };
+  t1: { igst: number; cgst: number; sgst: number };
+  t2: { igst: number; cgst: number; sgst: number };
+  t3: { igst: number; cgst: number; sgst: number };
+  c1: { igst: number; cgst: number; sgst: number };
+  t4: { igst: number; cgst: number; sgst: number };
+  c2: { igst: number; cgst: number; sgst: number };
+  exemptRatio: number;
+  d1: { igst: number; cgst: number; sgst: number };
+  d2: { igst: number; cgst: number; sgst: number };
+  eligibleItc: { igst: number; cgst: number; sgst: number };
+  totalReversal: { igst: number; cgst: number; sgst: number };
+}
+
+export interface Rule42PdfOptions {
+  filterTitle: string;
+  totalT: number;
+  totalReversal: number;
+  totalEligible: number;
+  rows: Rule42PdfMonth[];
+}
+
+export function exportRule42Pdf(opts: Rule42PdfOptions, filename: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Title band
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RULE 42 REPORT (INPUTS & SERVICES)", pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
+
+  // Summary block
+  const summaryRows: Array<[string, string]> = [
+    ["Total Inward ITC (T)", fmt(opts.totalT)],
+    ["Total ITC Reversal (D1 + D2)", fmt(opts.totalReversal)],
+    ["Net Eligible ITC Claimed", fmt(opts.totalEligible)],
+  ];
+
+  autoTable(doc, {
+    startY: 60,
+    head: [["SUMMARY", ""]],
+    body: summaryRows,
+    theme: "grid",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 11 },
+    bodyStyles: { fontSize: 10 },
+    columnStyles: {
+      0: { cellWidth: 220, fontStyle: "bold", fillColor: BAND },
+      1: { halign: "right", cellWidth: 160 },
+    },
+    margin: { left: 24, right: 24 },
+  });
+
+  const lastY = (doc as any).lastAutoTable.finalY + 16;
+  
+  const getSum = (field: "totalItc" | "t1" | "t2" | "t3" | "c1" | "t4" | "c2" | "d1" | "d2" | "eligibleItc" | "totalReversal") => {
+    return opts.rows.reduce((sum, r) => {
+      const v = r[field];
+      return sum + (v.igst + v.cgst + v.sgst);
+    }, 0);
+  };
+
+  autoTable(doc, {
+    startY: lastY,
+    head: [[
+      "Month", "Total (T)", "Non-Bus (T1)", "Exempt (T2)", "Blocked (T3)",
+      "Ledger (C1)", "Taxable (T4)", "Common (C2)", "Ratio (E/F)",
+      "Exempt Rev (D1)", "Non-Bus Rev (D2)", "Net Eligible"
+    ]],
+    body: opts.rows.map((r) => {
+      const tVal = r.totalItc.igst + r.totalItc.cgst + r.totalItc.sgst;
+      const t1Val = r.t1.igst + r.t1.cgst + r.t1.sgst;
+      const t2Val = r.t2.igst + r.t2.cgst + r.t2.sgst;
+      const t3Val = r.t3.igst + r.t3.cgst + r.t3.sgst;
+      const c1Val = r.c1.igst + r.c1.cgst + r.c1.sgst;
+      const t4Val = r.t4.igst + r.t4.cgst + r.t4.sgst;
+      const c2Val = r.c2.igst + r.c2.cgst + r.c2.sgst;
+      const d1Val = r.d1.igst + r.d1.cgst + r.d1.sgst;
+      const d2Val = r.d2.igst + r.d2.cgst + r.d2.sgst;
+      const eligVal = r.eligibleItc.igst + r.eligibleItc.cgst + r.eligibleItc.sgst;
+
+      return [
+        r.monthLabel,
+        fmt(tVal),
+        t1Val > 0 ? fmt(t1Val) : "—",
+        t2Val > 0 ? fmt(t2Val) : "—",
+        t3Val > 0 ? fmt(t3Val) : "—",
+        fmt(c1Val),
+        t4Val > 0 ? fmt(t4Val) : "—",
+        fmt(c2Val),
+        `${(r.exemptRatio * 100).toFixed(1)}%`,
+        fmt(d1Val),
+        fmt(d2Val),
+        fmt(eligVal)
+      ];
+    }),
+    foot: [[
+      "TOTAL",
+      fmt(getSum("totalItc")),
+      fmt(getSum("t1")),
+      fmt(getSum("t2")),
+      fmt(getSum("t3")),
+      fmt(getSum("c1")),
+      fmt(getSum("t4")),
+      fmt(getSum("c2")),
+      "",
+      fmt(getSum("d1")),
+      fmt(getSum("d2")),
+      fmt(getSum("eligibleItc"))
+    ]],
+    theme: "striped",
+    showFoot: "lastPage",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 8, halign: "center" },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 8, halign: "right" },
+    bodyStyles: { fontSize: 7, halign: "right" },
+    columnStyles: {
+      0: { halign: "left" },
+      9:  { textColor: [185, 28, 28], fontStyle: "bold" },
+      10: { textColor: [185, 28, 28], fontStyle: "bold" },
+      11: { textColor: [21, 128, 61], fontStyle: "bold", fontSize: 8 },
+    },
+    margin: { left: 18, right: 18 },
+    didDrawPage: () => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(`Generated by Rule 42 & 43 ITC Calculator · ${new Date().toLocaleDateString("en-IN")}`, w / 2, h - 12, { align: "center" });
+    },
+  });
+
+  doc.save(filename);
+}
+
+export function exportRule42ReconPdf(
+  opts: {
+    fyLabel: string;
+    recon: any;
+  },
+  filename: string,
+) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Title band
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(`RULE 42 ANNUAL RECONCILIATION — FY ${opts.fyLabel}`, pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  
+  const variance = opts.recon.variance.igst + opts.recon.variance.cgst + opts.recon.variance.sgst;
+  let statusText = "Perfect reconciliation";
+  if (variance > 0.01) {
+    statusText = `Shortfall identified: Reversal of Rs. ${fmt(variance)} required with 18% interest`;
+  } else if (variance < -0.01) {
+    statusText = `Excess reversals identified: Reclaimable ITC of Rs. ${fmt(Math.abs(variance))}`;
+  }
+  doc.text(statusText, pageWidth / 2, 38, { align: "center" });
+
+  const r = opts.recon;
+  const sumC2 = r.annualC2.igst + r.annualC2.cgst + r.annualC2.sgst;
+  const sumReqD1 = r.requiredD1.igst + r.requiredD1.cgst + r.requiredD1.sgst;
+  const sumReqD2 = r.requiredD2.igst + r.requiredD2.cgst + r.requiredD2.sgst;
+  const sumReqReversal = r.requiredTotalReversal.igst + r.requiredTotalReversal.cgst + r.requiredTotalReversal.sgst;
+  const sumActualReversed = r.sumMonthlyReversed.igst + r.sumMonthlyReversed.cgst + r.sumMonthlyReversed.sgst;
+  const sumVariance = r.variance.igst + r.variance.cgst + r.variance.sgst;
+
+  const rows = [
+    ["Annual Common Credit (C2)", fmt(r.annualC2.igst), fmt(r.annualC2.cgst), fmt(r.annualC2.sgst), fmt(sumC2)],
+    ["Annual Exempt Supplies Turnover (E)", "", "", "", fmt(r.annualExemptTurnover)],
+    ["Annual Total Supplies Turnover (F)", "", "", "", fmt(r.annualTotalTurnover)],
+    ["Annual Exempt Turnover Ratio (E/F)", "", "", "", `${(r.annualExemptRatio * 100).toFixed(2)}%`],
+    ["Annual Required Exempt Reversal (D1)", fmt(r.requiredD1.igst), fmt(r.requiredD1.cgst), fmt(r.requiredD1.sgst), fmt(sumReqD1)],
+    ["Annual Required Personal Reversal (D2 - 5%)", fmt(r.requiredD2.igst), fmt(r.requiredD2.cgst), fmt(r.requiredD2.sgst), fmt(sumReqD2)],
+    ["Annual Required Total Reversal (D1+D2)", fmt(r.requiredTotalReversal.igst), fmt(r.requiredTotalReversal.cgst), fmt(r.requiredTotalReversal.sgst), fmt(sumReqReversal)],
+    ["Actual Monthly Reversals Sum", fmt(r.sumMonthlyReversed.igst), fmt(r.sumMonthlyReversed.cgst), fmt(r.sumMonthlyReversed.sgst), fmt(sumActualReversed)],
+    ["Final Reversal Variance (Shortfall / Excess)", fmt(r.variance.igst), fmt(r.variance.cgst), fmt(r.variance.sgst), fmt(sumVariance)]
+  ];
+
+  autoTable(doc, {
+    startY: 70,
+    head: [["Calculation Item", "IGST (Rs.)", "CGST (Rs.)", "SGST (Rs.)", "Total (Rs.)"]],
+    body: rows,
+    theme: "grid",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9, halign: "center" },
+    bodyStyles: { fontSize: 8, halign: "right" },
+    columnStyles: {
+      0: { halign: "left", fontStyle: "bold", cellWidth: 200 },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 70 },
+      3: { cellWidth: 70 },
+      4: { cellWidth: 80, fontStyle: "bold" },
+    },
+    didParseCell: (data) => {
+      const rowIndex = data.row.index;
+      if (rowIndex === 1 || rowIndex === 2 || rowIndex === 3) {
+        if (data.column.index >= 1 && data.column.index <= 3) {
+          data.cell.text = [""];
+        }
+      }
+      if (rowIndex === 4 || rowIndex === 5) {
+        data.cell.styles.textColor = [185, 28, 28];
+        data.cell.styles.fillColor = [254, 226, 226];
+      }
+      if (rowIndex === 6) {
+        data.cell.styles.fillColor = [226, 232, 240];
+        data.cell.styles.fontStyle = "bold";
+      }
+      if (rowIndex === 7) {
+        data.cell.styles.textColor = [100, 116, 139];
+      }
+      if (rowIndex === 8) {
+        const isShort = sumVariance > 0.01;
+        data.cell.styles.textColor = isShort ? [185, 28, 28] : [21, 128, 61];
+        data.cell.styles.fillColor = isShort ? [254, 226, 226] : [220, 252, 231];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+    margin: { left: 24, right: 24 },
+    didDrawPage: () => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(`Generated by Rule 42 & 43 ITC Calculator · ${new Date().toLocaleDateString("en-IN")}`, w / 2, h - 12, { align: "center" });
+    },
+  });
+
+  doc.save(filename);
+}

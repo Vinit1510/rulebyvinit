@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { type Invoice, type UsageType, newInvoice } from "@/lib/rule43";
+import { type Invoice, type UsageType, type ItemType, newInvoice } from "@/lib/rule43";
 import { downloadImportTemplate } from "@/lib/excel";
 
 interface Props {
@@ -27,6 +27,7 @@ interface ParsedRow {
   sgstRate?: number;
   gstRate?: number;  // legacy / convenience alias — treated as IGST
   usage?: UsageType;
+  itemType?: ItemType;
   notes?: string;
   blockCredit?: boolean;
 }
@@ -89,6 +90,9 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   "rate": "gstRate",
   "usage": "usage",
   "usage type": "usage",
+  "item type": "itemType",
+  "type": "itemType",
+  "category": "itemType",
   "notes": "notes",
   "remarks": "notes",
   "note": "notes",
@@ -169,7 +173,15 @@ function parseUsage(v: string): UsageType {
   const val = v.trim().toLowerCase();
   if (val.includes("taxable") || val === "t") return "taxable";
   if (val.includes("exempt") || val === "e") return "exempt";
+  if (val.includes("non-business") || val.includes("non business") || val === "nb" || val === "personal" || val === "p" || val.includes("personal")) return "non-business";
   return "common";
+}
+
+function parseItemType(v: string): ItemType {
+  const val = v.trim().toLowerCase();
+  if (val.includes("service") || val === "s") return "service";
+  if (val.includes("input") || val === "i") return "input";
+  return "capital_good";
 }
 
 function parseDate(v: string): string {
@@ -216,6 +228,7 @@ function rowToInvoice(row: ParsedRow): Invoice {
     cgstRate,
     sgstRate,
     usage: row.usage ?? "common",
+    itemType: row.itemType ?? "capital_good",
     notes: row.notes,
     blockCredit: row.blockCredit ?? false,
   };
@@ -254,6 +267,8 @@ function parseRawRows(rawRows: Record<string, string>[]): { invoices: Invoice[];
         row.purchaseDate = parseDate(val);
       } else if (field === "usage") {
         row.usage = parseUsage(val);
+      } else if (field === "itemType") {
+        row.itemType = parseItemType(val);
       } else if (field === "blockCredit") {
         row.blockCredit = parseBool(val);
       } else {

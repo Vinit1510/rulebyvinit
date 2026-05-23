@@ -1,4 +1,5 @@
-export type UsageType = "taxable" | "exempt" | "common";
+export type ItemType = "input" | "service" | "capital_good";
+export type UsageType = "taxable" | "exempt" | "common" | "non-business";
 
 /** Tax breakdown shared by invoices, credit notes, and debit notes */
 export interface GstComponents {
@@ -52,6 +53,7 @@ export interface Invoice extends GstComponents {
   notes?: string;
   /** Section 17(5) blocked credit — entire ITC is ineligible; Rule 43 is not applied */
   blockCredit?: boolean;
+  itemType?: ItemType;
 }
 
 export interface MonthlyTurnover {
@@ -236,6 +238,7 @@ export function newInvoice(): Invoice {
     creditNotes: [],
     debitNotes: [],
     blockCredit: false,
+    itemType: "capital_good",
   };
 }
 
@@ -573,4 +576,293 @@ export function consolidate(
 
   const totalItc = perInv.reduce((s, x) => s + x.res.netTotalItc, 0);
   return { rows, totalReversal, totalRetained, totalItc, igstReversal, cgstReversal, sgstReversal };
+}
+
+// ============================================================================
+// GST RULE 42 MATH ENGINE (INPUTS & SERVICES)
+// ============================================================================
+
+export interface GstAmounts {
+  igst: number;
+  cgst: number;
+  sgst: number;
+}
+
+export function computeInvoiceItc(inv: Invoice): GstAmounts {
+  const tv = Number(inv.taxableValue) || 0;
+  return {
+    igst: (tv * (Number(inv.igstRate) || 0)) / 100,
+    cgst: (tv * (Number(inv.cgstRate) || 0)) / 100,
+    sgst: (tv * (Number(inv.sgstRate) || 0)) / 100,
+  };
+}
+
+export interface Rule42MonthResult {
+  monthKey: string; // YYYY-MM
+  monthLabel: string;
+  totalItc: GstAmounts; // T
+  t1: GstAmounts; // Non-business
+  t2: GstAmounts; // Exempt
+  t3: GstAmounts; // Blocked credit (Sec 17(5))
+  c1: GstAmounts; // Credited to Electronic Ledger = T - (T1+T2+T3)
+  t4: GstAmounts; // Taxable only
+  c2: GstAmounts; // Common credit = C1 - T4
+  exemptRatio: number; // E/F
+  d1: GstAmounts; // Reversal due to exempt = C2 * (E/F)
+  d2: GstAmounts; // Reversal due to non-business = C2 * 5%
+  c3: GstAmounts; // Net common credit = C2 - (D1+D2)
+  eligibleItc: GstAmounts; // Final eligible credit = T4 + C3
+  totalReversal: GstAmounts; // D1 + D2
+  invoiceCount: number;
+}
+
+export function computeRule42Month(
+  invoices: Invoice[],
+  monthKeyStr: string,
+  monthlyTurnover?: MonthlyTurnover,
+): Rule42MonthResult {
+  // Use 2nd day of the month to avoid timezone shifts pushing it to previous month
+  const monthLabelStr = monthLabel(new Date(monthKeyStr + "-02"));
+
+  // Filter Rule 42 items (inputs/services) whose purchase date is in this month
+  const monthInvoices = invoices.filter((inv) => {
+    if ((inv.itemType ?? "capital_good") === "capital_good") return false;
+    if (!inv.purchaseDate) return false;
+    return inv.purchaseDate.slice(0, 7) === monthKeyStr;
+  });
+
+  const totalItc = { igst: 0, cgst: 0, sgst: 0 };
+  const t1 = { igst: 0, cgst: 0, sgst: 0 };
+  const t2 = { igst: 0, cgst: 0, sgst: 0 };
+  const t3 = { igst: 0, cgst: 0, sgst: 0 };
+  const t4 = { igst: 0, cgst: 0, sgst: 0 };
+
+  for (const inv of monthInvoices) {
+    const amt = computeInvoiceItc(inv);
+    totalItc.igst += amt.igst;
+    totalItc.cgst += amt.cgst;
+    totalItc.sgst += amt.sgst;
+
+    if (inv.blockCredit) {
+      t3.igst += amt.igst;
+      t3.cgst += amt.cgst;
+      t3.sgst += amt.sgst;
+    } else if (inv.usage === "non-business") {
+      t1.igst += amt.igst;
+      t1.cgst += amt.cgst;
+      t1.sgst += amt.sgst;
+    } else if (inv.usage === "exempt") {
+      t2.igst += amt.igst;
+      t2.cgst += amt.cgst;
+      t2.sgst += amt.sgst;
+    } else if (inv.usage === "taxable") {
+      t4.igst += amt.igst;
+      t4.cgst += amt.cgst;
+      t4.sgst += amt.sgst;
+    }
+  }
+
+  const c1 = {
+    igst: Math.max(0, totalItc.igst - (t1.igst + t2.igst + t3.igst)),
+    cgst: Math.max(0, totalItc.cgst - (t1.cgst + t2.cgst + t3.cgst)),
+    sgst: Math.max(0, totalItc.sgst - (t1.sgst + t2.sgst + t3.sgst)),
+  };
+
+  const c2 = {
+    igst: Math.max(0, c1.igst - t4.igst),
+    cgst: Math.max(0, c1.cgst - t4.cgst),
+    sgst: Math.max(0, c1.sgst - t4.sgst),
+  };
+
+  const et = Number(monthlyTurnover?.exempt) || 0;
+  const tt = Number(monthlyTurnover?.taxable) || 0;
+  const tot = et + tt;
+  const exemptRatio = safeRatio(et, tot);
+
+  const d1 = {
+    igst: c2.igst * exemptRatio,
+    cgst: c2.cgst * exemptRatio,
+    sgst: c2.sgst * exemptRatio,
+  };
+
+  const d2 = {
+    igst: c2.igst * 0.05,
+    cgst: c2.cgst * 0.05,
+    sgst: c2.sgst * 0.05,
+  };
+
+  const c3 = {
+    igst: Math.max(0, c2.igst - (d1.igst + d2.igst)),
+    cgst: Math.max(0, c2.cgst - (d1.cgst + d2.cgst)),
+    sgst: Math.max(0, c2.sgst - (d1.sgst + d2.sgst)),
+  };
+
+  const eligibleItc = {
+    igst: t4.igst + c3.igst,
+    cgst: t4.cgst + c3.cgst,
+    sgst: t4.sgst + c3.sgst,
+  };
+
+  const totalReversal = {
+    igst: d1.igst + d2.igst,
+    cgst: d1.cgst + d2.cgst,
+    sgst: d1.sgst + d2.sgst,
+  };
+
+  return {
+    monthKey: monthKeyStr,
+    monthLabel: monthLabelStr,
+    totalItc,
+    t1,
+    t2,
+    t3,
+    c1,
+    t4,
+    c2,
+    exemptRatio,
+    d1,
+    d2,
+    c3,
+    eligibleItc,
+    totalReversal,
+    invoiceCount: monthInvoices.length,
+  };
+}
+
+export interface Rule42AnnualReconciliation {
+  fy: number;
+  fyLabel: string;
+  months: Rule42MonthResult[];
+  annualTotalItc: GstAmounts;
+  annualT1: GstAmounts;
+  annualT2: GstAmounts;
+  annualT3: GstAmounts;
+  annualC1: GstAmounts;
+  annualT4: GstAmounts;
+  annualC2: GstAmounts;
+  annualExemptTurnover: number;
+  annualTotalTurnover: number;
+  annualExemptRatio: number;
+  requiredD1: GstAmounts;
+  requiredD2: GstAmounts;
+  requiredTotalReversal: GstAmounts;
+  sumMonthlyReversed: GstAmounts;
+  variance: GstAmounts;
+}
+
+export function reconcileRule42Annual(
+  invoices: Invoice[],
+  turnovers: Record<string, MonthlyTurnover>,
+  fy: number,
+): Rule42AnnualReconciliation {
+  const monthKeys: string[] = [];
+  for (let m = 3; m < 12; m++) {
+    monthKeys.push(`${fy}-${String(m + 1).padStart(2, "0")}`);
+  }
+  for (let m = 0; m < 3; m++) {
+    monthKeys.push(`${fy + 1}-${String(m + 1).padStart(2, "0")}`);
+  }
+
+  const months: Rule42MonthResult[] = [];
+  let annualExemptTurnover = 0;
+  let annualTotalTurnover = 0;
+
+  const annualTotalItc = { igst: 0, cgst: 0, sgst: 0 };
+  const annualT1 = { igst: 0, cgst: 0, sgst: 0 };
+  const annualT2 = { igst: 0, cgst: 0, sgst: 0 };
+  const annualT3 = { igst: 0, cgst: 0, sgst: 0 };
+  const annualC1 = { igst: 0, cgst: 0, sgst: 0 };
+  const annualT4 = { igst: 0, cgst: 0, sgst: 0 };
+  const annualC2 = { igst: 0, cgst: 0, sgst: 0 };
+  const sumMonthlyReversed = { igst: 0, cgst: 0, sgst: 0 };
+
+  for (const mk of monthKeys) {
+    const t = turnovers[mk] ?? { exempt: 0, taxable: 0 };
+    const et = Number(t.exempt) || 0;
+    const tt = Number(t.taxable) || 0;
+    annualExemptTurnover += et;
+    annualTotalTurnover += et + tt;
+
+    const res = computeRule42Month(invoices, mk, t);
+    months.push(res);
+
+    annualTotalItc.igst += res.totalItc.igst;
+    annualTotalItc.cgst += res.totalItc.cgst;
+    annualTotalItc.sgst += res.totalItc.sgst;
+
+    annualT1.igst += res.t1.igst;
+    annualT1.cgst += res.t1.cgst;
+    annualT1.sgst += res.t1.sgst;
+
+    annualT2.igst += res.t2.igst;
+    annualT2.cgst += res.t2.cgst;
+    annualT2.sgst += res.t2.sgst;
+
+    annualT3.igst += res.t3.igst;
+    annualT3.cgst += res.t3.cgst;
+    annualT3.sgst += res.t3.sgst;
+
+    annualC1.igst += res.c1.igst;
+    annualC1.cgst += res.c1.cgst;
+    annualC1.sgst += res.c1.sgst;
+
+    annualT4.igst += res.t4.igst;
+    annualT4.cgst += res.t4.cgst;
+    annualT4.sgst += res.t4.sgst;
+
+    annualC2.igst += res.c2.igst;
+    annualC2.cgst += res.c2.cgst;
+    annualC2.sgst += res.c2.sgst;
+
+    sumMonthlyReversed.igst += res.totalReversal.igst;
+    sumMonthlyReversed.cgst += res.totalReversal.cgst;
+    sumMonthlyReversed.sgst += res.totalReversal.sgst;
+  }
+
+  const annualExemptRatio = safeRatio(annualExemptTurnover, annualTotalTurnover);
+
+  const requiredD1 = {
+    igst: annualC2.igst * annualExemptRatio,
+    cgst: annualC2.cgst * annualExemptRatio,
+    sgst: annualC2.sgst * annualExemptRatio,
+  };
+
+  const requiredD2 = {
+    igst: annualC2.igst * 0.05,
+    cgst: annualC2.cgst * 0.05,
+    sgst: annualC2.sgst * 0.05,
+  };
+
+  const requiredTotalReversal = {
+    igst: requiredD1.igst + requiredD2.igst,
+    cgst: requiredD1.cgst + requiredD2.cgst,
+    sgst: requiredD1.sgst + requiredD2.sgst,
+  };
+
+  const variance = {
+    igst: requiredTotalReversal.igst - sumMonthlyReversed.igst,
+    cgst: requiredTotalReversal.cgst - sumMonthlyReversed.cgst,
+    sgst: requiredTotalReversal.sgst - sumMonthlyReversed.sgst,
+  };
+
+  return {
+    fy,
+    fyLabel: fyLabel(fy),
+    months,
+    annualTotalItc,
+    annualT1,
+    annualT2,
+    annualT3,
+    annualC1,
+    annualT4,
+    annualC2,
+    annualExemptTurnover,
+    annualTotalTurnover,
+    annualExemptRatio,
+    requiredD1,
+    requiredD2,
+    requiredTotalReversal,
+    sumMonthlyReversed,
+    variance,
+  };
 }
