@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown } from "lucide-react";
 import {
-  type Invoice, type MonthlyTurnover, type Rule43Result,
+  type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
   type GstAmounts, type Rule42MonthResult, type Rule42AnnualReconciliation,
   computeRule42Month, reconcileRule42Annual,
