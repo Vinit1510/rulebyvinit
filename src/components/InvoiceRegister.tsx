@@ -28,7 +28,18 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
   const [importOpen, setImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "rule42" | "rule43">("all");
-  const [monthFilter, setMonthFilter] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+
+  const availableYears = Array.from(
+    new Set(
+      invoices
+        .map((inv) => (inv.purchaseDate ? inv.purchaseDate.slice(0, 4) : null))
+        .filter(Boolean)
+    )
+  ).sort();
+  const currentYear = new Date().getFullYear();
+  const years = availableYears.length > 0 ? availableYears : [String(currentYear - 1), String(currentYear), String(currentYear + 1)];
 
   const filteredInvoices = invoices.filter((inv) => {
     const itemType = inv.itemType ?? "capital_good";
@@ -40,8 +51,11 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
     }
 
     // 2. Filter by month/year
-    if (monthFilter) {
-      if (!inv.purchaseDate || inv.purchaseDate.slice(0, 7) !== monthFilter) return false;
+    if (selectedYear) {
+      if (!inv.purchaseDate || inv.purchaseDate.slice(0, 4) !== selectedYear) return false;
+    }
+    if (selectedMonth) {
+      if (!inv.purchaseDate || inv.purchaseDate.slice(5, 7) !== selectedMonth) return false;
     }
 
     // 3. Filter by search query
@@ -145,16 +159,46 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                     className="h-9 text-xs pl-9 bg-background w-full"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-medium shrink-0">Purchase Month:</span>
-                  <Input
-                    type="month"
-                    value={monthFilter}
-                    onChange={(e) => setMonthFilter(e.target.value)}
-                    className="h-9 text-xs w-[160px] bg-background"
-                  />
-                  {monthFilter && (
-                    <Button variant="ghost" size="sm" onClick={() => setMonthFilter("")} className="h-9 text-xs px-2.5 text-muted-foreground hover:text-foreground">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-medium shrink-0">Year:</span>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="flex h-9 w-[100px] rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground font-medium cursor-pointer"
+                    >
+                      <option value="">All Years</option>
+                      {years.map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-medium shrink-0">Month:</span>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="flex h-9 w-[110px] rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground font-medium cursor-pointer"
+                    >
+                      <option value="">All Months</option>
+                      <option value="01">January</option>
+                      <option value="02">February</option>
+                      <option value="03">March</option>
+                      <option value="04">April</option>
+                      <option value="05">May</option>
+                      <option value="06">June</option>
+                      <option value="07">July</option>
+                      <option value="08">August</option>
+                      <option value="09">September</option>
+                      <option value="10">October</option>
+                      <option value="11">November</option>
+                      <option value="12">December</option>
+                    </select>
+                  </div>
+
+                  {(selectedYear || selectedMonth) && (
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedYear(""); setSelectedMonth(""); }} className="h-9 text-xs px-2 text-muted-foreground hover:text-foreground">
                       Clear
                     </Button>
                   )}

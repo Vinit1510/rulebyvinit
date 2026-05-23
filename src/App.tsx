@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Calculator, Moon, Sun, RotateCcw, Loader2,
-  LayoutDashboard, FileText, IndianRupee, FileSpreadsheet, Menu, X
+  LayoutDashboard, FileText, IndianRupee, FileSpreadsheet, Menu, X, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Switch as RouteSwitch, Route, useLocation, Router as WouterRouter } from "wouter";
 import { InvoiceRegister } from "@/components/InvoiceRegister";
@@ -39,6 +39,7 @@ function MainApp() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Redirect root / to /dashboard
   useEffect(() => {
@@ -52,22 +53,40 @@ function MainApp() {
   const months = useMemo(() => unionMonths(calc.state.invoices), [calc.state.invoices]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-foreground flex overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col w-64 border-r bg-card no-print sticky top-0 h-screen flex-shrink-0">
+      <aside className={`hidden md:flex flex-col ${sidebarCollapsed ? "w-16" : "w-64"} border-r bg-card no-print h-full flex-shrink-0 transition-all duration-300`}>
         {/* Brand / Logo */}
-        <div className="px-6 py-6 border-b flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-            <Calculator className="h-5 w-5" />
+        <div className={`px-4 py-6 border-b flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <Calculator className="h-5 w-5" />
+            </div>
+            {!sidebarCollapsed && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                <h1 className="text-sm font-semibold leading-tight text-foreground">Rule 42 &amp; 43</h1>
+                <p className="text-[10px] text-muted-foreground leading-tight">GST ITC Apportionment</p>
+              </motion.div>
+            )}
           </div>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight text-foreground">Rule 42 &amp; 43 Suite</h1>
-            <p className="text-[10px] text-muted-foreground leading-tight">GST ITC Apportionment</p>
-          </div>
+          {!sidebarCollapsed && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setSidebarCollapsed(true)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
+        {/* Collapsed Expand Trigger */}
+        {sidebarCollapsed && (
+          <div className="py-2 border-b flex justify-center">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setSidebarCollapsed(false)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Navigation Links */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className="flex-1 px-3 py-6 space-y-1">
           {TABS.map((t) => {
             const Icon = t.icon;
             const isActive = activeTab === t.value;
@@ -76,7 +95,8 @@ function MainApp() {
                 key={t.value}
                 type="button"
                 onClick={() => setLocation(t.value)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all relative ${
+                title={sidebarCollapsed ? t.label : undefined}
+                className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-0 py-3" : "gap-3 px-4 py-3"} rounded-lg text-sm font-semibold transition-all relative ${
                   isActive
                     ? "text-primary bg-primary/5 font-bold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -89,8 +109,8 @@ function MainApp() {
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <Icon className={`h-4 w-4 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                {t.label}
+                <Icon className={`h-4 w-4 flex-shrink-0 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                {!sidebarCollapsed && <span>{t.label}</span>}
               </button>
             );
           })}
@@ -98,41 +118,78 @@ function MainApp() {
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t space-y-2">
-          <div className="flex items-center justify-between px-2">
-            <span className="text-xs text-muted-foreground">Theme</span>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} aria-label="Toggle theme">
-              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
-          </div>
-          
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2 px-2 h-8">
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset Data
+          {sidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} title="Toggle theme">
+                {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset everything?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will delete all your invoices and turnover entries from your account. This cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => { calc.reset(); setLocation("/dashboard"); toast({ title: "Reset complete", description: "All data cleared." }); }}
-                >Reset</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          
-          <div className="pt-2 border-t flex items-center justify-between px-1">
-            <UserMenu />
-            {calc.syncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-          </div>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Reset Data">
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Reset everything?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will delete all your invoices and turnover entries from your account. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => { calc.reset(); setLocation("/dashboard"); toast({ title: "Reset complete", description: "All data cleared." }); }}
+                    >Reset</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              
+              <div className="pt-2 border-t w-full flex items-center justify-center">
+                <UserMenu />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between px-2">
+                <span className="text-xs text-muted-foreground">Theme</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} aria-label="Toggle theme">
+                  {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </Button>
+              </div>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2 px-2 h-8">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset Data
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Reset everything?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will delete all your invoices and turnover entries from your account. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => { calc.reset(); setLocation("/dashboard"); toast({ title: "Reset complete", description: "All data cleared." }); }}
+                    >Reset</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              
+              <div className="pt-2 border-t flex items-center justify-between px-1">
+                <UserMenu />
+                {calc.syncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
@@ -237,7 +294,7 @@ function MainApp() {
       </AnimatePresence>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col h-full overflow-y-auto overflow-x-hidden">
         {/* Mobile Top Bar */}
         <header className="md:hidden sticky top-0 z-30 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70 flex items-center justify-between px-6 py-4 no-print flex-shrink-0">
           <div className="flex items-center gap-3">

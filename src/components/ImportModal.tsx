@@ -227,7 +227,7 @@ function rowToInvoice(row: ParsedRow): Invoice {
     igstRate,
     cgstRate,
     sgstRate,
-    usage: row.usage ?? "common",
+    usage: row.usage ?? "taxable",
     itemType: row.itemType ?? "capital_good",
     notes: row.notes,
     blockCredit: row.blockCredit ?? false,
