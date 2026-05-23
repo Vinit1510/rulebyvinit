@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -14,6 +13,7 @@ import { Switch as RouteSwitch, Route, useLocation, Router as WouterRouter } fro
 import { InvoiceRegister } from "@/components/InvoiceRegister";
 import { TurnoverTable } from "@/components/TurnoverTable";
 import { ResultsPanel } from "@/components/ResultsPanel";
+import { DashboardView } from "@/components/DashboardView";
 import { UserMenu } from "@/components/UserMenu";
 import { AuthPage } from "@/pages/AuthPage";
 import { useCalculator } from "@/hooks/useCalculator";
@@ -24,38 +24,41 @@ import { unionMonths } from "@/lib/rule43";
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const TABS = [
-  { value: "invoices", label: "1. Invoices" },
-  { value: "turnover", label: "2. Turnover" },
-  { value: "reports", label: "3. Reports" },
+  { value: "/dashboard", label: "Dashboard" },
+  { value: "/invoices", label: "Invoices" },
+  { value: "/turnover", label: "Turnover" },
+  { value: "/reports", label: "Reports" },
 ];
 
 function MainApp() {
   const calc = useCalculator();
   const { theme, toggle } = useTheme();
   const { toast } = useToast();
-  const [tab, setTab] = useState<string>(() => {
-    if (typeof window === "undefined") return "invoices";
-    const saved = window.localStorage.getItem("rule43.activeTab");
-    return saved && TABS.some((t) => t.value === saved) ? saved : "invoices";
-  });
+  const [location, setLocation] = useLocation();
+
+  // Redirect root / to /dashboard
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem("rule43.activeTab", tab);
-  }, [tab]);
+    if (location === "/" || location === "") {
+      setLocation("/dashboard");
+    }
+  }, [location, setLocation]);
+
+  const activeTab = TABS.some(t => t.value === location) ? location : "/dashboard";
 
   const months = useMemo(() => unionMonths(calc.state.invoices), [calc.state.invoices]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70 no-print">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <div className="w-full px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Calculator className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-semibold leading-tight">Rule 43 ITC Calculator</h1>
+              <h1 className="text-base sm:text-lg font-semibold leading-tight">Rule 42 &amp; 43 ITC Suite</h1>
               <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">
-                Multi-invoice capital goods ITC reversal under CGST Rule 43
+                Inputs &amp; Capital Goods ITC apportionment &amp; reversals
               </p>
             </div>
           </div>
@@ -79,7 +82,7 @@ function MainApp() {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => { calc.reset(); setTab("invoices"); toast({ title: "Reset complete", description: "All data cleared." }); }}
+                    onClick={() => { calc.reset(); setLocation("/dashboard"); toast({ title: "Reset complete", description: "All data cleared." }); }}
                   >Reset</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -89,40 +92,63 @@ function MainApp() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
-        <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-auto p-1 no-print">
-            {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="text-xs sm:text-sm py-2">{t.label}</TabsTrigger>
-            ))}
-          </TabsList>
+      <main className="w-full px-6 sm:px-8 py-6 flex-1">
+        {/* Navigation Tabs */}
+        <div className="flex bg-muted/40 p-1 rounded-lg border gap-1 self-start w-full sm:w-auto no-print mb-6">
+          {TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setLocation(t.value)}
+              className={`text-xs px-5 py-2.5 rounded-md font-semibold transition-all flex-1 sm:flex-none text-center ${
+                activeTab === t.value
+                  ? "bg-background text-foreground shadow-md border border-border font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="mt-6">
-            <AnimatePresence mode="wait">
-              <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
-                <TabsContent value="invoices" forceMount={tab === "invoices" ? true : undefined} hidden={tab !== "invoices"}>
-                  <InvoiceRegister
-                    invoices={calc.state.invoices}
-                    onSave={calc.upsertInvoice}
-                    onDelete={calc.deleteInvoice}
-                    onImport={calc.bulkImport}
-                  />
-                </TabsContent>
-                <TabsContent value="turnover" forceMount={tab === "turnover" ? true : undefined} hidden={tab !== "turnover"}>
-                  <TurnoverTable
-                    months={months}
-                    turnover={calc.state.turnover}
-                    setTurnover={calc.setTurnover}
-                    applyToAll={calc.applyToAllTurnover}
-                  />
-                </TabsContent>
-                <TabsContent value="reports" forceMount={tab === "reports" ? true : undefined} hidden={tab !== "reports"}>
-                  <ResultsPanel invoices={calc.state.invoices} turnover={calc.state.turnover} />
-                </TabsContent>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </Tabs>
+        <div className="mt-6">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+              {activeTab === "/dashboard" && (
+                <DashboardView
+                  invoices={calc.state.invoices}
+                  turnover={calc.state.turnover}
+                  onNavigate={setLocation}
+                  onAddInvoice={() => {
+                    setLocation("/invoices");
+                  }}
+                  onImport={() => {
+                    setLocation("/invoices");
+                  }}
+                />
+              )}
+              {activeTab === "/invoices" && (
+                <InvoiceRegister
+                  invoices={calc.state.invoices}
+                  onSave={calc.upsertInvoice}
+                  onDelete={calc.deleteInvoice}
+                  onImport={calc.bulkImport}
+                />
+              )}
+              {activeTab === "/turnover" && (
+                <TurnoverTable
+                  months={months}
+                  turnover={calc.state.turnover}
+                  setTurnover={calc.setTurnover}
+                  applyToAll={calc.applyToAllTurnover}
+                />
+              )}
+              {activeTab === "/reports" && (
+                <ResultsPanel invoices={calc.state.invoices} turnover={calc.state.turnover} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </main>
 
       <Toaster />
@@ -160,6 +186,10 @@ function App() {
       <TooltipProvider delayDuration={150}>
         <RouteSwitch>
           <Route path="/sign-in" component={AuthPage} />
+          <Route path="/dashboard" component={ProtectedRoute} />
+          <Route path="/invoices" component={ProtectedRoute} />
+          <Route path="/turnover" component={ProtectedRoute} />
+          <Route path="/reports" component={ProtectedRoute} />
           <Route path="/" component={ProtectedRoute} />
           <Route component={ProtectedRoute} />
         </RouteSwitch>

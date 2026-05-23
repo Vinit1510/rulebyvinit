@@ -531,8 +531,9 @@ export function consolidate(
   invoices: Invoice[],
   turnover: Record<string, MonthlyTurnover>,
 ): { rows: ConsolidatedRow[]; totalReversal: number; totalRetained: number; totalItc: number; igstReversal: number; cgstReversal: number; sgstReversal: number } {
-  const months = unionMonths(invoices);
-  const perInv = invoices.map((inv) => ({ inv, res: computeInvoice(inv, turnover) }));
+  const capGoods = invoices.filter((inv) => (inv.itemType ?? "capital_good") === "capital_good");
+  const months = unionMonths(capGoods);
+  const perInv = capGoods.map((inv) => ({ inv, res: computeInvoice(inv, turnover) }));
   const rowByKey = new Map<string, ConsolidatedRow>();
 
   for (const d of months) {

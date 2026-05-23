@@ -28,16 +28,23 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
   const [importOpen, setImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "rule42" | "rule43">("all");
+  const [monthFilter, setMonthFilter] = useState("");
 
   const filteredInvoices = invoices.filter((inv) => {
+    const itemType = inv.itemType ?? "capital_good";
     // 1. Filter by item type
     if (typeFilter === "rule42") {
-      if (inv.itemType === "capital_good") return false;
+      if (itemType === "capital_good") return false;
     } else if (typeFilter === "rule43") {
-      if (inv.itemType !== "capital_good" && inv.itemType !== undefined) return false;
+      if (itemType !== "capital_good") return false;
     }
 
-    // 2. Filter by search query
+    // 2. Filter by month/year
+    if (monthFilter) {
+      if (!inv.purchaseDate || inv.purchaseDate.slice(0, 7) !== monthFilter) return false;
+    }
+
+    // 3. Filter by search query
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return (
@@ -128,8 +135,8 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
             </div>
           ) : (
             <>
-              <div className="p-4 border-b bg-muted/10">
-                <div className="relative max-w-md w-full">
+              <div className="p-4 border-b bg-muted/10 flex flex-wrap gap-4 items-center justify-between">
+                <div className="relative max-w-md w-full flex-1 min-w-[280px]">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search invoices by number, item description, supplier, GSTIN or notes..."
@@ -137,6 +144,20 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="h-9 text-xs pl-9 bg-background w-full"
                   />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium shrink-0">Purchase Month:</span>
+                  <Input
+                    type="month"
+                    value={monthFilter}
+                    onChange={(e) => setMonthFilter(e.target.value)}
+                    className="h-9 text-xs w-[160px] bg-background"
+                  />
+                  {monthFilter && (
+                    <Button variant="ghost" size="sm" onClick={() => setMonthFilter("")} className="h-9 text-xs px-2.5 text-muted-foreground hover:text-foreground">
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
               <Table>
