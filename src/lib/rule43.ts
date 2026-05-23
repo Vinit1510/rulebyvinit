@@ -686,10 +686,11 @@ export function computeRule42Month(
     sgst: c2.sgst * exemptRatio,
   };
 
+  const hasNonBusiness = (t1.igst + t1.cgst + t1.sgst) > 0;
   const d2 = {
-    igst: c2.igst * 0.05,
-    cgst: c2.cgst * 0.05,
-    sgst: c2.sgst * 0.05,
+    igst: hasNonBusiness ? c2.igst * 0.05 : 0,
+    cgst: hasNonBusiness ? c2.cgst * 0.05 : 0,
+    sgst: hasNonBusiness ? c2.sgst * 0.05 : 0,
   };
 
   const c3 = {
@@ -828,10 +829,11 @@ export function reconcileRule42Annual(
     sgst: annualC2.sgst * annualExemptRatio,
   };
 
+  const annualHasNonBusiness = (annualT1.igst + annualT1.cgst + annualT1.sgst) > 0;
   const requiredD2 = {
-    igst: annualC2.igst * 0.05,
-    cgst: annualC2.cgst * 0.05,
-    sgst: annualC2.sgst * 0.05,
+    igst: annualHasNonBusiness ? annualC2.igst * 0.05 : 0,
+    cgst: annualHasNonBusiness ? annualC2.cgst * 0.05 : 0,
+    sgst: annualHasNonBusiness ? annualC2.sgst * 0.05 : 0,
   };
 
   const requiredTotalReversal = {
