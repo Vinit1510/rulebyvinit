@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -543,11 +543,194 @@ function Rule42AnnualReconciliationReport({
   );
 }
 
+interface CombinedReversalsSummaryProps {
+  invoices: Invoice[];
+  turnover: Record<string, MonthlyTurnover>;
+}
+
+function CombinedReversalsSummary({ invoices, turnover }: CombinedReversalsSummaryProps) {
+  const availableYears = useMemo(() => {
+    const ys = new Set<number>();
+    for (const inv of invoices) {
+      if (inv.purchaseDate) ys.add(fyStartYear(new Date(inv.purchaseDate)));
+    }
+    for (const k of Object.keys(turnover)) {
+      const yr = Number(k.slice(0, 4));
+      const mth = Number(k.slice(5, 7));
+      if (!isNaN(yr)) {
+        const d = new Date(yr, mth - 1, 1);
+        ys.add(fyStartYear(d));
+      }
+    }
+    if (ys.size === 0) ys.add(fyStartYear(new Date()));
+    return Array.from(ys).sort((a, b) => a - b);
+  }, [invoices, turnover]);
+
+  const [selectedFy, setSelectedFy] = useState<number>(() => {
+    return availableYears[availableYears.length - 1] ?? fyStartYear(new Date());
+  });
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedFy)) {
+      setSelectedFy(availableYears[availableYears.length - 1]);
+    }
+  }, [availableYears, selectedFy]);
+
+  const monthsOfFy = useMemo(() => {
+    const monthKeys: string[] = [];
+    for (let m = 3; m < 12; m++) {
+      monthKeys.push(`${selectedFy}-${String(m + 1).padStart(2, "0")}`);
+    }
+    for (let m = 0; m < 3; m++) {
+      monthKeys.push(`${selectedFy + 1}-${String(m + 1).padStart(2, "0")}`);
+    }
+    return monthKeys;
+  }, [selectedFy]);
+
+  const r43Consol = useMemo(() => consolidate(invoices, turnover), [invoices, turnover]);
+  const r43RowByMonth = useMemo(() => {
+    const m = new Map<string, ConsolidatedRow>();
+    for (const r of r43Consol.rows) {
+      m.set(r.monthKey, r);
+    }
+    return m;
+  }, [r43Consol]);
+
+  const rows = useMemo(() => {
+    return monthsOfFy.map((mk) => {
+      const date = new Date(mk + "-02");
+      const label = date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+      const t = turnover[mk] ?? { exempt: 0, taxable: 0 };
+
+      const r42 = computeRule42Month(invoices, mk, t);
+      const r43 = r43RowByMonth.get(mk) ?? {
+        igstReversal: 0,
+        cgstReversal: 0,
+        sgstReversal: 0,
+        totalReversal: 0,
+      };
+
+      const combined = {
+        igst: r42.totalReversal.igst + r43.igstReversal,
+        cgst: r42.totalReversal.cgst + r43.cgstReversal,
+        sgst: r42.totalReversal.sgst + r43.sgstReversal,
+        total: (r42.totalReversal.igst + r42.totalReversal.cgst + r42.totalReversal.sgst) + r43.totalReversal,
+      };
+
+      return {
+        monthKey: mk,
+        label,
+        r42Reversal: r42.totalReversal.igst + r42.totalReversal.cgst + r42.totalReversal.sgst,
+        r43Reversal: r43.totalReversal,
+        combined,
+      };
+    });
+  }, [monthsOfFy, invoices, turnover, r43RowByMonth]);
+
+  const totals = useMemo(() => {
+    const sum = { igst: 0, cgst: 0, sgst: 0, total: 0, r42: 0, r43: 0 };
+    for (const r of rows) {
+      sum.igst += r.combined.igst;
+      sum.cgst += r.combined.cgst;
+      sum.sgst += r.combined.sgst;
+      sum.total += r.combined.total;
+      sum.r42 += r.r42Reversal;
+      sum.r43 += r.r43Reversal;
+    }
+    return sum;
+  }, [rows]);
+
+  return (
+    <div className="space-y-5">
+      <Card className="no-print">
+        <CardContent className="py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground font-semibold">Select Financial Year</span>
+            <Select value={String(selectedFy)} onValueChange={(v) => setSelectedFy(Number(v))}>
+              <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)}>FY {fyLabel(y)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-3.5 w-3.5 mr-1.5" />Print Page</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">GSTR-3B Combined Reversals Summary (Rule 42 &amp; 43)</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Month-by-month consolidated reversals to declare directly in GSTR-3B Table 4(B)
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-semibold">Month</TableHead>
+                  <TableHead className="text-right font-semibold">Rule 42 Reversal (₹)</TableHead>
+                  <TableHead className="text-right font-semibold">Rule 43 Reversal (₹)</TableHead>
+                  <TableHead className="text-right font-semibold text-primary bg-primary/5">Combined IGST (₹)</TableHead>
+                  <TableHead className="text-right font-semibold text-primary bg-primary/5">Combined CGST (₹)</TableHead>
+                  <TableHead className="text-right font-semibold text-primary bg-primary/5">Combined SGST (₹)</TableHead>
+                  <TableHead className="text-right font-bold text-destructive bg-destructive/5">Grand Total Reversal (₹)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.monthKey} className="hover:bg-muted/40 text-xs">
+                    <TableCell className="font-semibold">{r.label}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(r.r42Reversal)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(r.r43Reversal)}</TableCell>
+                    <TableCell className="text-right num font-medium text-primary bg-primary/5">{formatINRPrecise(r.combined.igst)}</TableCell>
+                    <TableCell className="text-right num font-medium text-primary bg-primary/5">{formatINRPrecise(r.combined.cgst)}</TableCell>
+                    <TableCell className="text-right num font-medium text-primary bg-primary/5">{formatINRPrecise(r.combined.sgst)}</TableCell>
+                    <TableCell className="text-right num font-bold text-destructive bg-destructive/5 text-sm">{formatINRPrecise(r.combined.total)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/20 font-bold border-t-2 text-xs">
+                  <TableCell className="text-sm">Total FY {fyLabel(selectedFy)}</TableCell>
+                  <TableCell className="text-right num text-sm">{formatINRPrecise(totals.r42)}</TableCell>
+                  <TableCell className="text-right num text-sm">{formatINRPrecise(totals.r43)}</TableCell>
+                  <TableCell className="text-right num font-bold text-primary bg-primary/5 text-sm">{formatINRPrecise(totals.igst)}</TableCell>
+                  <TableCell className="text-right num font-bold text-primary bg-primary/5 text-sm">{formatINRPrecise(totals.cgst)}</TableCell>
+                  <TableCell className="text-right num font-bold text-primary bg-primary/5 text-sm">{formatINRPrecise(totals.sgst)}</TableCell>
+                  <TableCell className="text-right num font-black text-destructive bg-destructive/5 text-base">{formatINRPrecise(totals.total)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ResultsPanel({ invoices, turnover }: Props) {
-  const [reportType, setReportType] = useState<"rule43" | "rule42">("rule43");
+  const [reportType, setReportType] = useState<"rule43" | "rule42" | "combined">("rule43");
   const [view, setView] = useState<string>("consolidated");
   const [r42View, setR42View] = useState<string>("r42-monthly");
   const [filter, setFilter] = useState<ReportFilter>(() => defaultFilter(invoices));
+  const consol = useMemo(() => consolidate(invoices, turnover), [invoices, turnover]);
+
+  // Keep filter synchronized with invoices when data loads
+  useEffect(() => {
+    if (invoices.length > 0) {
+      setFilter((prev) => {
+        const hasMatching = invoices.some(i => i.purchaseDate && fyStartYear(new Date(i.purchaseDate)) === prev.fy);
+        if (!hasMatching) {
+          return defaultFilter(invoices);
+        }
+        return prev;
+      });
+    }
+  }, [invoices]);
   const consol = useMemo(() => consolidate(invoices, turnover), [invoices, turnover]);
 
   if (invoices.length === 0) {
@@ -570,7 +753,7 @@ export function ResultsPanel({ invoices, turnover }: Props) {
     <div className="space-y-5 print-page">
       {/* Top Level Rule Toggle */}
       <div className="flex bg-muted/40 p-1.5 rounded-xl border gap-2 self-start w-full sm:w-auto no-print">
-        {(["rule43", "rule42"] as const).map((rt) => (
+        {(["rule43", "rule42", "combined"] as const).map((rt) => (
           <button
             key={rt}
             type="button"
@@ -581,7 +764,7 @@ export function ResultsPanel({ invoices, turnover }: Props) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {rt === "rule43" ? "Rule 43 (Capital Goods)" : "Rule 42 (Inputs & Services)"}
+            {rt === "rule43" ? "Rule 43 (Capital Goods)" : rt === "rule42" ? "Rule 42 (Inputs & Services)" : "Final Total Reversal (Rule 42+43)"}
           </button>
         ))}
       </div>
@@ -614,7 +797,7 @@ export function ResultsPanel({ invoices, turnover }: Props) {
             <BlockCreditReport invoices={invoices} />
           </TabsContent>
         </Tabs>
-      ) : (
+      ) : reportType === "rule42" ? (
         <Tabs value={r42View} onValueChange={setR42View}>
           <TabsList>
             <TabsTrigger value="r42-monthly">Rule 42 — Monthly Apportionment</TabsTrigger>
@@ -636,6 +819,8 @@ export function ResultsPanel({ invoices, turnover }: Props) {
             />
           </TabsContent>
         </Tabs>
+      ) : (
+        <CombinedReversalsSummary invoices={invoices} turnover={turnover} />
       )}
     </div>
   );
