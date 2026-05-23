@@ -731,7 +731,6 @@ export function ResultsPanel({ invoices, turnover }: Props) {
       });
     }
   }, [invoices]);
-  const consol = useMemo(() => consolidate(invoices, turnover), [invoices, turnover]);
 
   if (invoices.length === 0) {
     return (
