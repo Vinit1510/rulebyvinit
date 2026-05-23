@@ -53,37 +53,31 @@ function MainApp() {
   const months = useMemo(() => unionMonths(calc.state.invoices), [calc.state.invoices]);
 
   return (
-    <div className="h-screen w-screen bg-background text-foreground flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-foreground flex overflow-hidden bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.08),rgba(255,255,255,0))]">
       {/* Sidebar - Desktop */}
-      <aside className={`hidden md:flex flex-col ${sidebarCollapsed ? "w-16" : "w-64"} border-r bg-card no-print h-full flex-shrink-0 transition-all duration-300`}>
+      <aside className={`hidden md:flex flex-col ${sidebarCollapsed ? "w-20" : "w-64"} border bg-card/60 backdrop-blur-xl no-print h-[calc(100vh-2rem)] my-4 ml-4 mr-2 rounded-2xl shadow-xl flex-shrink-0 transition-all duration-300 relative`}>
+        {/* Floating Border Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border bg-background shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer z-50 transition-all hover:scale-110 hover:border-primary/50"
+          title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
+
         {/* Brand / Logo */}
-        <div className={`px-4 py-6 border-b flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-              <Calculator className="h-5 w-5" />
-            </div>
-            {!sidebarCollapsed && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <h1 className="text-sm font-semibold leading-tight text-foreground">Rule 42 &amp; 43</h1>
-                <p className="text-[10px] text-muted-foreground leading-tight">GST ITC Apportionment</p>
-              </motion.div>
-            )}
+        <div className={`px-6 py-6 border-b flex items-center ${sidebarCollapsed ? "justify-center" : "justify-start gap-3"}`}>
+          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 shadow-inner">
+            <Calculator className="h-5 w-5" />
           </div>
           {!sidebarCollapsed && (
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setSidebarCollapsed(true)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+            <motion.div initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -5 }} transition={{ duration: 0.2 }}>
+              <h1 className="text-sm font-bold leading-tight text-foreground bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Rule 42 &amp; 43</h1>
+              <p className="text-[10px] text-muted-foreground leading-tight">GST ITC Apportionment</p>
+            </motion.div>
           )}
         </div>
-
-        {/* Collapsed Expand Trigger */}
-        {sidebarCollapsed && (
-          <div className="py-2 border-b flex justify-center">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setSidebarCollapsed(false)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
 
         {/* Navigation Links */}
         <nav className="flex-1 px-3 py-6 space-y-1">
@@ -98,35 +92,37 @@ function MainApp() {
                 title={sidebarCollapsed ? t.label : undefined}
                 className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-0 py-3" : "gap-3 px-4 py-3"} rounded-lg text-sm font-semibold transition-all relative ${
                   isActive
-                    ? "text-primary bg-primary/5 font-bold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "text-primary font-bold animate-pulse-subtle"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
                 }`}
               >
                 {isActive && (
                   <motion.div
-                    layoutId="sidebar-active-indicator"
-                    className="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-primary"
+                    layoutId="sidebar-active-bg-gradient"
+                    className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border-l-2 border-primary z-0 shadow-sm"
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <Icon className={`h-4 w-4 flex-shrink-0 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                {!sidebarCollapsed && <span>{t.label}</span>}
+                <div className="relative z-10 flex items-center gap-3">
+                  <Icon className={`h-4 w-4 flex-shrink-0 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  {!sidebarCollapsed && <span>{t.label}</span>}
+                </div>
               </button>
             );
           })}
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t space-y-2">
+        <div className="p-4 border-t space-y-2 relative z-10">
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} title="Toggle theme">
+              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50 rounded-lg" onClick={toggle} title="Toggle theme">
                 {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
               </Button>
               
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Reset Data">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-lg" title="Reset Data">
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
@@ -154,15 +150,15 @@ function MainApp() {
           ) : (
             <>
               <div className="flex items-center justify-between px-2">
-                <span className="text-xs text-muted-foreground">Theme</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggle} aria-label="Toggle theme">
+                <span className="text-xs text-muted-foreground font-medium">Theme</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50 rounded-lg" onClick={toggle} aria-label="Toggle theme">
                   {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                 </Button>
               </div>
               
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2 px-2 h-8">
+                  <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2 px-2 h-8 rounded-lg animate-pulse-subtle">
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset Data
                   </Button>
@@ -209,15 +205,15 @@ function MainApp() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 z-50 w-72 bg-card border-r flex flex-col md:hidden no-print"
+              className="fixed inset-y-0 left-0 z-50 w-72 bg-card/90 backdrop-blur-xl border-r flex flex-col md:hidden no-print"
             >
               <div className="px-6 py-6 border-b flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-inner">
                     <Calculator className="h-5 w-5" />
                   </div>
                   <div>
-                    <h1 className="text-sm font-semibold leading-tight text-foreground">Rule 42 &amp; 43 Suite</h1>
+                    <h1 className="text-sm font-bold leading-tight text-foreground">Rule 42 &amp; 43</h1>
                     <p className="text-[10px] text-muted-foreground leading-tight">GST ITC Apportionment</p>
                   </div>
                 </div>
@@ -238,7 +234,7 @@ function MainApp() {
                         setLocation(t.value);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all relative ${
                         isActive
                           ? "text-primary bg-primary/5 font-bold"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -294,7 +290,7 @@ function MainApp() {
       </AnimatePresence>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col h-full overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Top Bar */}
         <header className="md:hidden sticky top-0 z-30 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70 flex items-center justify-between px-6 py-4 no-print flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -314,44 +310,46 @@ function MainApp() {
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 px-6 sm:px-8 py-6 w-full max-w-[1600px] mx-auto">
-          <AnimatePresence mode="wait">
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
-              {activeTab === "/dashboard" && (
-                <DashboardView
-                  invoices={calc.state.invoices}
-                  turnover={calc.state.turnover}
-                  onNavigate={setLocation}
-                  onAddInvoice={() => {
-                    setLocation("/invoices");
-                  }}
-                  onImport={() => {
-                    setLocation("/invoices");
-                  }}
-                />
-              )}
-              {activeTab === "/invoices" && (
-                <InvoiceRegister
-                  invoices={calc.state.invoices}
-                  onSave={calc.upsertInvoice}
-                  onDelete={calc.deleteInvoice}
-                  onImport={calc.bulkImport}
-                />
-              )}
-              {activeTab === "/turnover" && (
-                <TurnoverTable
-                  months={months}
-                  turnover={calc.state.turnover}
-                  setTurnover={calc.setTurnover}
-                  applyToAll={calc.applyToAllTurnover}
-                />
-              )}
-              {activeTab === "/reports" && (
-                <ResultsPanel invoices={calc.state.invoices} turnover={calc.state.turnover} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+        {/* Main Content Area (Floating Card on Desktop) */}
+        <main className="flex-grow md:my-4 md:mr-4 md:ml-2 md:p-6 md:bg-card/40 md:backdrop-blur-md md:border md:rounded-2xl md:shadow-xl overflow-y-auto no-scrollbar scroll-smooth no-print">
+          <div className="max-w-[1600px] w-full mx-auto p-4 md:p-0">
+            <AnimatePresence mode="wait">
+              <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+                {activeTab === "/dashboard" && (
+                  <DashboardView
+                    invoices={calc.state.invoices}
+                    turnover={calc.state.turnover}
+                    onNavigate={setLocation}
+                    onAddInvoice={() => {
+                      setLocation("/invoices");
+                    }}
+                    onImport={() => {
+                      setLocation("/invoices");
+                    }}
+                  />
+                )}
+                {activeTab === "/invoices" && (
+                  <InvoiceRegister
+                    invoices={calc.state.invoices}
+                    onSave={calc.upsertInvoice}
+                    onDelete={calc.deleteInvoice}
+                    onImport={calc.bulkImport}
+                  />
+                )}
+                {activeTab === "/turnover" && (
+                  <TurnoverTable
+                    months={months}
+                    turnover={calc.state.turnover}
+                    setTurnover={calc.setTurnover}
+                    applyToAll={calc.applyToAllTurnover}
+                  />
+                )}
+                {activeTab === "/reports" && (
+                  <ResultsPanel invoices={calc.state.invoices} turnover={calc.state.turnover} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
       </div>
 
