@@ -576,6 +576,49 @@ export async function downloadImportTemplate() {
   });
   ws.getRow(1).height = 30;
 
+  // Data Validation Dropdown Lists for rows 2 through 500
+  for (let r = 2; r <= 500; r++) {
+    // Column E (5): Item Type
+    ws.getCell(r, 5).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"input, service, capital_good"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid Item Type",
+      error: "Please select input, service, or capital_good from the dropdown.",
+    };
+
+    // Column K (11): Usage
+    ws.getCell(r, 11).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"common, taxable, exempt, non-business"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid Usage",
+      error: "Please select common, taxable, exempt, or non-business from the dropdown.",
+    };
+
+    // Column L (12): Personal / Non-Business Use
+    ws.getCell(r, 12).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"100% Business, 100% Personal (T1), Partial Personal (D2)"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid Personal Use",
+      error: "Please select 100% Business, 100% Personal (T1), or Partial Personal (D2) from the dropdown.",
+    };
+
+    // Column M (13): Block Credit
+    ws.getCell(r, 13).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"No, Yes"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid Block Credit",
+      error: "Please select No or Yes from the dropdown.",
+    };
+  }
+
   const samples: Array<Record<string, string | number>> = [
     { invoiceNo: "INV-001", purchaseDate: "15-04-2025", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", itemType: "capital_good", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "" },
     { invoiceNo: "INV-002", purchaseDate: "10-05-2025", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", itemType: "capital_good", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "Inter-state" },
