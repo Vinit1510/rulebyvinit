@@ -239,14 +239,22 @@ function Rule42MonthlyReport({
     }
 
     return filteredInvoices.map((inv) => {
-      const totTax = (inv.igst || 0) + (inv.cgst || 0) + (inv.sgst || 0);
-      let t1 = 0, t2 = 0, t3 = 0, d1 = 0, d2 = 0;
+      const igstVal = (inv.taxableValue || 0) * ((inv.igstRate || 0) / 100);
+      const cgstVal = (inv.taxableValue || 0) * ((inv.cgstRate || 0) / 100);
+      const sgstVal = (inv.taxableValue || 0) * ((inv.sgstRate || 0) / 100);
+      const totTax = igstVal + cgstVal + sgstVal;
+
+      let t1Igst = 0, t1Cgst = 0, t1Sgst = 0;
+      let t2Igst = 0, t2Cgst = 0, t2Sgst = 0;
+      let t3Igst = 0, t3Cgst = 0, t3Sgst = 0;
+      let d1Igst = 0, d1Cgst = 0, d1Sgst = 0;
+      let d2Igst = 0, d2Cgst = 0, d2Sgst = 0;
 
       if (inv.nonBusinessUse === "100_personal") {
-        t1 = totTax;
-      } else if (inv.usageType === "exempt") {
-        t2 = totTax;
-      } else if (inv.usageType === "taxable") {
+        t1Igst = igstVal; t1Cgst = cgstVal; t1Sgst = sgstVal;
+      } else if (inv.usage === "exempt") {
+        t2Igst = igstVal; t2Cgst = cgstVal; t2Sgst = sgstVal;
+      } else if (inv.usage === "taxable") {
         // T4 - 100% Taxable
       } else {
         // Common C2
@@ -255,24 +263,33 @@ function Rule42MonthlyReport({
           const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           const mRes = monthResultMap.get(mk);
           const ratio = mRes ? mRes.exemptRatio : 0;
-          d1 = totTax * ratio;
+          d1Igst = igstVal * ratio;
+          d1Cgst = cgstVal * ratio;
+          d1Sgst = sgstVal * ratio;
+
           if (inv.nonBusinessUse === "partial_personal") {
-            d2 = totTax * 0.05;
+            d2Igst = igstVal * 0.05;
+            d2Cgst = cgstVal * 0.05;
+            d2Sgst = sgstVal * 0.05;
           }
         }
       }
 
-      const reversalAmt = t1 + t2 + t3 + d1 + d2;
+      const reversalIgst = t1Igst + t2Igst + t3Igst + d1Igst + d2Igst;
+      const reversalCgst = t1Cgst + t2Cgst + t3Cgst + d1Cgst + d2Cgst;
+      const reversalSgst = t1Sgst + t2Sgst + t3Sgst + d1Sgst + d2Sgst;
+      const reversalAmt = reversalIgst + reversalCgst + reversalSgst;
       const netClaimAmt = Math.max(0, totTax - reversalAmt);
 
       return {
         inv,
+        igstVal,
+        cgstVal,
+        sgstVal,
         totTax,
-        t1,
-        t2,
-        t3,
-        d1,
-        d2,
+        reversalIgst,
+        reversalCgst,
+        reversalSgst,
         reversalAmt,
         netClaimAmt,
       };
@@ -283,9 +300,9 @@ function Rule42MonthlyReport({
     let taxableVal = 0, igst = 0, cgst = 0, sgst = 0, totalTax = 0, reversal = 0, netClaim = 0;
     for (const item of detailedInvoiceRows) {
       taxableVal += item.inv.taxableValue || 0;
-      igst += item.inv.igst || 0;
-      cgst += item.inv.cgst || 0;
-      sgst += item.inv.sgst || 0;
+      igst += item.igstVal;
+      cgst += item.cgstVal;
+      sgst += item.sgstVal;
       totalTax += item.totTax;
       reversal += item.reversalAmt;
       netClaim += item.netClaimAmt;
@@ -294,37 +311,37 @@ function Rule42MonthlyReport({
   }, [detailedInvoiceRows]);
 
   const handleDetailedExcel = async () => {
-    const regRows = detailedInvoiceRows.map(({ inv, totTax, netClaimAmt }) => ({
-      invoiceNo: inv.invoiceNumber || "—",
+    const regRows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, netClaimAmt }) => ({
+      invoiceNo: inv.invoiceNo || "—",
       date: inv.purchaseDate || "—",
-      asset: inv.assetDescription || "Input Service",
-      supplier: inv.supplierName || "—",
-      gstin: inv.supplierGstin || "—",
+      asset: inv.assetName || "Input Service",
+      supplier: inv.supplier || "—",
+      gstin: inv.gstin || "—",
       taxableValue: inv.taxableValue || 0,
       netItc: totTax,
-      igstRev: inv.igst || 0,
-      cgstRev: inv.cgst || 0,
-      sgstRev: inv.sgst || 0,
+      igstRev: igstVal,
+      cgstRev: cgstVal,
+      sgstRev: sgstVal,
       retained: netClaimAmt,
-      status: inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      status: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
     }));
     await exportRegisterXlsx({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`);
   };
 
   const handleDetailedPdf = () => {
-    const regRows = detailedInvoiceRows.map(({ inv, totTax, netClaimAmt }) => ({
-      invoiceNo: inv.invoiceNumber || "—",
+    const regRows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, netClaimAmt }) => ({
+      invoiceNo: inv.invoiceNo || "—",
       date: inv.purchaseDate || "—",
-      asset: inv.assetDescription || "Input Service",
-      supplier: inv.supplierName || "—",
-      gstin: inv.supplierGstin || "—",
+      asset: inv.assetName || "Input Service",
+      supplier: inv.supplier || "—",
+      gstin: inv.gstin || "—",
       taxableValue: inv.taxableValue || 0,
       netItc: totTax,
-      igstRev: inv.igst || 0,
-      cgstRev: inv.cgst || 0,
-      sgstRev: inv.sgst || 0,
+      igstRev: igstVal,
+      cgstRev: cgstVal,
+      sgstRev: sgstVal,
       retained: netClaimAmt,
-      status: inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      status: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
     }));
     exportRegisterPdf({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`);
   };
@@ -636,22 +653,22 @@ function Rule42MonthlyReport({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    detailedInvoiceRows.map(({ inv, totTax, reversalAmt, netClaimAmt }) => (
+                    detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, reversalAmt, netClaimAmt }) => (
                       <TableRow key={inv.id} className="hover:bg-muted/40 text-xs">
                         <TableCell className="font-mono text-[11px]">{inv.purchaseDate}</TableCell>
-                        <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
-                        <TableCell className="truncate max-w-[160px]" title={inv.supplierName}>{inv.supplierName || "—"}</TableCell>
-                        <TableCell className="font-mono text-[11px]">{inv.supplierGstin || "—"}</TableCell>
-                        <TableCell className="truncate max-w-[130px]" title={inv.assetDescription}>{inv.assetDescription || "Input Service"}</TableCell>
+                        <TableCell className="font-medium">{inv.invoiceNo || "—"}</TableCell>
+                        <TableCell className="truncate max-w-[160px]" title={inv.supplier}>{inv.supplier || "—"}</TableCell>
+                        <TableCell className="font-mono text-[11px]">{inv.gstin || "—"}</TableCell>
+                        <TableCell className="truncate max-w-[130px]" title={inv.assetName}>{inv.assetName || "Input Service"}</TableCell>
                         <TableCell className="text-right num font-medium">{formatINR(inv.taxableValue)}</TableCell>
-                        <TableCell className="text-right num">{inv.igst > 0 ? formatINR(inv.igst) : "—"}</TableCell>
-                        <TableCell className="text-right num">{inv.cgst > 0 ? formatINR(inv.cgst) : "—"}</TableCell>
-                        <TableCell className="text-right num">{inv.sgst > 0 ? formatINR(inv.sgst) : "—"}</TableCell>
-                        <TableCell className="text-right num font-semibold">{formatINR(totTax)}</TableCell>
+                        <TableCell className="text-right num">{igstVal > 0 ? formatINRPrecise(igstVal) : "—"}</TableCell>
+                        <TableCell className="text-right num">{cgstVal > 0 ? formatINRPrecise(cgstVal) : "—"}</TableCell>
+                        <TableCell className="text-right num">{sgstVal > 0 ? formatINRPrecise(sgstVal) : "—"}</TableCell>
+                        <TableCell className="text-right num font-semibold">{formatINRPrecise(totTax)}</TableCell>
                         <TableCell className="text-center">
                           <div className="flex flex-col items-center gap-0.5">
-                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${inv.usageType === "taxable" ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30" : inv.usageType === "exempt" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" : "bg-primary/10 text-primary border-primary/30"}`}>
-                              {inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : "Common Use (C2)"}
+                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${inv.usage === "taxable" ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30" : inv.usage === "exempt" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" : "bg-primary/10 text-primary border-primary/30"}`}>
+                              {inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : "Common Use (C2)"}
                             </Badge>
                             {inv.nonBusinessUse === "100_personal" && (
                               <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-destructive/15 text-destructive border-destructive/30">100% Personal (T1)</Badge>
