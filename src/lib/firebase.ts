@@ -157,6 +157,19 @@ export async function updateCodeStatus(codeId: string, status: "active" | "revok
   }
 }
 
+/** Delete an Activation Code permanently from Firestore */
+export async function deleteActivationCode(codeId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE_URL}/activation_codes/${codeId}`, {
+      method: "DELETE",
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete activation code:", e);
+    return false;
+  }
+}
+
 /** Verify if an activation code is valid, active, and lock it to 1 Gmail address */
 export async function verifyActivationCode(
   inputCode: string,
@@ -169,10 +182,13 @@ export async function verifyActivationCode(
     const match = codes.find(c => c.code === cleanInput);
 
     if (!match) {
-      return { valid: false, message: "Invalid activation code." };
+      return { valid: false, message: "Invalid activation code. Please check and try again." };
     }
     if (match.status === "revoked") {
-      return { valid: false, message: "This activation code has been revoked by admin." };
+      return {
+        valid: false,
+        message: "Account Access Suspended: Your activation code is pending, expired, or deactivated. Please contact support to activate your account.",
+      };
     }
     if (match.status === "redeemed" && match.usedByEmail) {
       if (cleanEmail && match.usedByEmail.toLowerCase() !== cleanEmail) {

@@ -39,19 +39,27 @@ export function AuthPage() {
         const settings = await getAdminSettings();
         const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
 
-        if (!settings.activationRequired || storedCode) {
+        if (!settings.activationRequired) {
           toast({
             title: "Signed in successfully!",
             description: "Google Drive Sync is active. Loading your dashboard...",
           });
           setLocation("/dashboard");
         } else {
-          // Activation required and user hasn't activated yet
+          // Activation enforcement is ON: check if stored code is still active & valid for this email
+          if (storedCode) {
+            const check = await verifyActivationCode(storedCode, user?.email);
+            if (check.valid) {
+              setLocation("/dashboard");
+              return;
+            }
+          }
+          // No stored code, or stored code was deactivated/revoked/deleted by admin!
           setShowActivationModal(true);
         }
       })();
     }
-  }, [isSignedIn, setLocation, toast]);
+  }, [isSignedIn, setLocation, toast, user]);
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,7 +220,7 @@ export function AuthPage() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Activation Code</Label>
               <Input
-                placeholder="e.g. R43-6CD7"
+                placeholder="Enter Activation Code"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
                 className="text-sm font-mono tracking-wider uppercase h-10"

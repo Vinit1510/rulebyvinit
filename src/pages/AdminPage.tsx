@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import {
   ShieldCheck, Key, ArrowLeft, Save,
-  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut
+  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import {
   getAdminSettings, updateAdminSettings, getActivationCodes,
-  createActivationCode, updateCodeStatus, getRegisteredUsers,
+  createActivationCode, updateCodeStatus, deleteActivationCode, getRegisteredUsers,
   type ActivationCode, type UserRecord, type AdminSettings
 } from "@/lib/firebase";
 
@@ -127,7 +127,7 @@ export function AdminPage() {
       toast({
         title: checked ? "Activation Code Enforcement ENABLED" : "Trial Mode ENABLED (OFF)",
         description: checked
-          ? "New users must enter a valid activation code to access the app."
+          ? "New & un-activated users must enter a valid activation code to access the app."
           : "Trial mode active: Anyone can sign in with Google freely without an activation code.",
       });
     } else {
@@ -173,7 +173,7 @@ export function AdminPage() {
     }
   };
 
-  // Handle Code Revocation / Status change
+  // Handle Code Activation / Deactivation Toggle
   const handleToggleCodeStatus = async (codeId: string, currentStatus: string) => {
     const nextStatus = currentStatus === "revoked" ? "active" : "revoked";
     const ok = await updateCodeStatus(codeId, nextStatus);
@@ -182,8 +182,28 @@ export function AdminPage() {
         prev.map((c) => (c.id === codeId ? { ...c, status: nextStatus } : c))
       );
       toast({
-        title: `Code ${nextStatus === "revoked" ? "Revoked" : "Re-activated"}`,
-        description: `Status updated to ${nextStatus}.`,
+        title: `Code ${nextStatus === "revoked" ? "Deactivated" : "Activated"}`,
+        description: nextStatus === "revoked"
+          ? "User account access suspended for this code."
+          : "Code is now active for access.",
+      });
+    }
+  };
+
+  // Handle Code Deletion
+  const handleDeleteCode = async (codeId: string, codeText: string) => {
+    const ok = await deleteActivationCode(codeId);
+    if (ok) {
+      setCodes((prev) => prev.filter((c) => c.id !== codeId));
+      toast({
+        title: "Code Deleted Permanently",
+        description: `Code ${codeText} has been deleted from database.`,
+      });
+    } else {
+      toast({
+        title: "Failed to delete code",
+        description: "Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -241,7 +261,7 @@ export function AdminPage() {
                   <Label className="text-xs font-semibold">Master Admin Password</Label>
                   <Input
                     type="password"
-                    placeholder="Default: vinit@2026"
+                    placeholder="Enter Admin Password"
                     value={adminPasswordInput}
                     onChange={(e) => setAdminPasswordInput(e.target.value)}
                     className="text-xs h-10"
@@ -304,6 +324,39 @@ export function AdminPage() {
         </div>
       </div>
 
+      {/* Summary Badges Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total Registered Users</p>
+            <p className="text-lg font-bold">{users.length}</p>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+            <KeyRound className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Active Codes</p>
+            <p className="text-lg font-bold">{codes.filter(c => c.status === "active" || c.status === "redeemed").length}</p>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center font-bold">
+            <Lock className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Deactivated Codes</p>
+            <p className="text-lg font-bold">{codes.filter(c => c.status === "revoked").length}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Grid Section 1: Activation Toggle & Admin Password */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Master ON/OFF Activation Toggle Card */}
@@ -326,11 +379,11 @@ export function AdminPage() {
                     : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                 }`}
               >
-                {settings.activationRequired ? "ON (Code Required)" : "OFF (Trial Mode)"}
+                {settings.activationRequired ? "ON (Strict Code Required)" : "OFF (Trial Mode)"}
               </span>
             </div>
             <CardDescription className="text-xs mt-1">
-              Toggle whether new users must enter a valid activation code to access the calculator.
+              Toggle whether users must have a valid activation code to access the app.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -338,13 +391,13 @@ export function AdminPage() {
               <div className="space-y-0.5">
                 <p className="text-xs font-semibold">
                   {settings.activationRequired
-                    ? "Enforce Code for New Users"
+                    ? "Enforce Code (Strict Mode)"
                     : "Trial Mode (Free Access)"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {settings.activationRequired
-                    ? "Users will be asked to enter a valid code after signing in."
-                    : "Users can sign in with Google and use the app freely without any code."}
+                    ? "Strict Mode: All users (including existing trial users) must have a valid active code."
+                    : "Trial mode active: Anyone can sign in with Google freely without an activation code."}
                 </p>
               </div>
 
@@ -415,7 +468,7 @@ export function AdminPage() {
             <form onSubmit={handleSaveClientId} className="space-y-3">
               <div className="space-y-1">
                 <Input
-                  placeholder="e.g. 1234567890-xyz.apps.googleusercontent.com"
+                  placeholder="Enter Client ID"
                   value={tempClientId}
                   onChange={(e) => setTempClientId(e.target.value)}
                   className="text-xs h-9 font-mono"
@@ -505,7 +558,7 @@ export function AdminPage() {
                               : "bg-red-500/15 text-red-600"
                           }`}
                         >
-                          {c.status}
+                          {c.status === "revoked" ? "Deactivated" : c.status}
                         </span>
 
                         <Button
@@ -522,12 +575,24 @@ export function AdminPage() {
                           )}
                         </Button>
 
+                        {/* Activate / Deactivate Toggle Button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-7 w-7 ${c.status === "revoked" ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-600 hover:bg-amber-50"}`}
+                          onClick={() => handleToggleCodeStatus(c.id, c.status)}
+                          title={c.status === "revoked" ? "Activate Code" : "Deactivate Code"}
+                        >
+                          <Power className="h-3.5 w-3.5" />
+                        </Button>
+
+                        {/* Delete Code Button */}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                          onClick={() => handleToggleCodeStatus(c.id, c.status)}
-                          title={c.status === "revoked" ? "Re-activate Code" : "Revoke Code"}
+                          onClick={() => handleDeleteCode(c.id, c.code)}
+                          title="Delete Code Permanently"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
