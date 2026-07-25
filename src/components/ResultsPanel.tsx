@@ -17,7 +17,7 @@ import {
   type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
   type GstAmounts, type Rule42MonthResult, type Rule42AnnualReconciliation,
-  computeRule42Month, reconcileRule42Annual,
+  computeRule42Month, reconcileRule42Annual, fyStartYear, fyLabel,
 } from "@/lib/rule43";
 import {
   exportRule43Xlsx, exportInvoiceXlsx, exportRegisterXlsx, exportBlockedCreditXlsx,

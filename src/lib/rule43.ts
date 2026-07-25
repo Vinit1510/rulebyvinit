@@ -149,6 +149,20 @@ export function formatINRPrecise(n: number): string {
   }).format(n);
 }
 
+export function fyStartYear(d?: Date | null): number {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) {
+    const now = new Date();
+    return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  }
+  return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+export function fyLabel(y?: number | null): string {
+  const numY = Number(y);
+  if (!numY || isNaN(numY)) return "2025-26";
+  return `${numY}-${String((numY + 1) % 100).padStart(2, "0")}`;
+}
+
 export function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
