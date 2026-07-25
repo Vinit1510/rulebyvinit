@@ -77,9 +77,6 @@ export function AuthPage() {
           <CardHeader className="pb-4 text-center">
             <div className="flex items-center justify-center gap-2">
               <CardTitle className="text-lg">Secure Google Drive Sync</CardTitle>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
-                Coming Soon
-              </span>
             </div>
             <CardDescription className="text-xs mt-1">
               Your financial records are saved directly in your personal cloud. No third-party servers.
@@ -103,7 +100,7 @@ export function AuthPage() {
             >
               <div className="flex items-center gap-2">
                 <GoogleIcon />
-                <span>{clientId ? "Continue with Google" : "Connect Google Drive (Setup Required)"}</span>
+                <span>Continue with Google</span>
               </div>
             </Button>
 
