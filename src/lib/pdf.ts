@@ -426,28 +426,105 @@ export function exportRule42Pdf(opts: Rule42PdfOptions, filename: string) {
   doc.setFontSize(10);
   doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
 
-  const sumD1 = opts.rows.reduce((s, r) => s + (r.d1.igst + r.d1.cgst + r.d1.sgst), 0);
-  const sumD2 = opts.rows.reduce((s, r) => s + (r.d2.igst + r.d2.cgst + r.d2.sgst), 0);
+  const getSumHead = (field: "totalItc" | "t1" | "t2" | "t3" | "c1" | "t4" | "c2" | "d1" | "d2" | "eligibleItc" | "totalReversal", head: "igst" | "cgst" | "sgst") => {
+    return opts.rows.reduce((sum, r) => sum + ((r[field] && r[field][head]) || 0), 0);
+  };
 
-  // Summary block
-  const summaryRows: Array<[string, string]> = [
-    ["Total Inward ITC (T)", fmt(opts.totalT)],
-    ["Exempt Supplies Reversal (D1)", fmt(sumD1)],
-    ["⭐ Non-Business Reversal (D2 - Clause j 5%)", fmt(sumD2)],
-    ["Total ITC Reversal (D1 + D2)", fmt(opts.totalReversal)],
-    ["Net Eligible ITC Claimed", fmt(opts.totalEligible)],
+  const sumT1 = getSumHead("t1", "igst") + getSumHead("t1", "cgst") + getSumHead("t1", "sgst");
+  const sumT2 = getSumHead("t2", "igst") + getSumHead("t2", "cgst") + getSumHead("t2", "sgst");
+  const sumT3 = getSumHead("t3", "igst") + getSumHead("t3", "cgst") + getSumHead("t3", "sgst");
+  const sumD1 = getSumHead("d1", "igst") + getSumHead("d1", "cgst") + getSumHead("d1", "sgst");
+  const sumD2 = getSumHead("d2", "igst") + getSumHead("d2", "cgst") + getSumHead("d2", "sgst");
+
+  // Head-wise Summary block
+  const headSummaryRows = [
+    [
+      "Total Inward ITC (T)",
+      fmt(getSumHead("totalItc", "igst")),
+      fmt(getSumHead("totalItc", "cgst")),
+      fmt(getSumHead("totalItc", "sgst")),
+      fmt(opts.totalT)
+    ],
+    [
+      "Exclusive Non-Business Reversal (T1)",
+      fmt(getSumHead("t1", "igst")),
+      fmt(getSumHead("t1", "cgst")),
+      fmt(getSumHead("t1", "sgst")),
+      fmt(sumT1)
+    ],
+    [
+      "Exclusive Exempt Reversal (T2)",
+      fmt(getSumHead("t2", "igst")),
+      fmt(getSumHead("t2", "cgst")),
+      fmt(getSumHead("t2", "sgst")),
+      fmt(sumT2)
+    ],
+    [
+      "Blocked Credit u/s 17(5) Reversal (T3)",
+      fmt(getSumHead("t3", "igst")),
+      fmt(getSumHead("t3", "cgst")),
+      fmt(getSumHead("t3", "sgst")),
+      fmt(sumT3)
+    ],
+    [
+      "Common Exempt Supplies Reversal (D1)",
+      fmt(getSumHead("d1", "igst")),
+      fmt(getSumHead("d1", "cgst")),
+      fmt(getSumHead("d1", "sgst")),
+      fmt(sumD1)
+    ],
+    [
+      "⭐ Common Non-Business Reversal (D2 - 5%)",
+      fmt(getSumHead("d2", "igst")),
+      fmt(getSumHead("d2", "cgst")),
+      fmt(getSumHead("d2", "sgst")),
+      fmt(sumD2)
+    ],
+    [
+      "TOTAL OF ALL REVERSALS (T1+T2+T3+D1+D2)",
+      fmt(getSumHead("totalReversal", "igst")),
+      fmt(getSumHead("totalReversal", "cgst")),
+      fmt(getSumHead("totalReversal", "sgst")),
+      fmt(opts.totalReversal)
+    ],
+    [
+      "NET ELIGIBLE CLAIMED ITC (T4+C3)",
+      fmt(getSumHead("eligibleItc", "igst")),
+      fmt(getSumHead("eligibleItc", "cgst")),
+      fmt(getSumHead("eligibleItc", "sgst")),
+      fmt(opts.totalEligible)
+    ],
   ];
 
   autoTable(doc, {
     startY: 60,
-    head: [["SUMMARY", ""]],
-    body: summaryRows,
+    head: [["Calculation Component", "IGST (Rs.)", "CGST (Rs.)", "SGST (Rs.)", "Total Amount (Rs.)"]],
+    body: headSummaryRows,
     theme: "grid",
-    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 11 },
-    bodyStyles: { fontSize: 10 },
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9, halign: "center" },
+    bodyStyles: { fontSize: 8, halign: "right" },
     columnStyles: {
-      0: { cellWidth: 220, fontStyle: "bold", fillColor: BAND },
-      1: { halign: "right", cellWidth: 160 },
+      0: { halign: "left", fontStyle: "bold", cellWidth: 220 },
+      1: { cellWidth: 90 },
+      2: { cellWidth: 90 },
+      3: { cellWidth: 90 },
+      4: { cellWidth: 100, fontStyle: "bold" },
+    },
+    didParseCell: (data) => {
+      const idx = data.row.index;
+      if (idx >= 1 && idx <= 5) {
+        data.cell.styles.textColor = [185, 28, 28];
+      }
+      if (idx === 6) {
+        data.cell.styles.fillColor = [254, 226, 226];
+        data.cell.styles.textColor = [185, 28, 28];
+        data.cell.styles.fontStyle = "bold";
+      }
+      if (idx === 7) {
+        data.cell.styles.fillColor = [220, 252, 231];
+        data.cell.styles.textColor = [21, 128, 61];
+        data.cell.styles.fontStyle = "bold";
+      }
     },
     margin: { left: 24, right: 24 },
   });

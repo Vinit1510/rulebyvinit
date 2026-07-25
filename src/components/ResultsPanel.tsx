@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown } from "lucide-react";
+import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText } from "lucide-react";
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
@@ -223,234 +223,356 @@ function Rule42MonthlyReport({
     }, filename);
   };
 
+  const [reportType, setReportType] = useState<"summary" | "detailed">("summary");
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((inv) => {
+      if ((inv.itemType ?? "capital_good") === "capital_good") return false;
+      if (!inv.purchaseDate) return false;
+      const d = new Date(inv.purchaseDate);
+      if (isNaN(d.getTime())) return false;
+      return inFilter(d, filter);
+    });
+  }, [invoices, filter]);
+
   return (
     <div className="space-y-5">
       <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
 
-      {/* Summary totals block */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground font-medium">Total Inward ITC (T)</div>
-            <div className="num text-xl font-bold text-primary mt-1">{formatINR(sumT)}</div>
-            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
-              <span>I:{formatINR(totT.igst)}</span>
-              <span>C:{formatINR(totT.cgst)}</span>
-              <span>S:{formatINR(totT.sgst)}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-amber-500/5 border-amber-500/20">
-          <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground font-medium">Exempt Reversal (D1)</div>
-            <div className="num text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{formatINR(sumD1)}</div>
-            <div className="text-[10px] text-muted-foreground mt-1">Based on E/F ratio</div>
-          </CardContent>
-        </Card>
-        <Card className={`border-2 transition-all ${anyD2Applied ? "bg-rose-500/10 border-rose-500/40 shadow-sm" : "bg-muted/30 border-border"}`}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-bold text-rose-700 dark:text-rose-300">⭐ Non-Business Reversal (D2)</div>
-              {anyD2Applied ? (
-                <Badge variant="outline" className="text-[9px] bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-500/30">
-                  5% Active
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">
-                  0% (N/A)
-                </Badge>
-              )}
-            </div>
-            <div className="num text-xl font-black text-rose-600 dark:text-rose-400 mt-1">{formatINR(sumD2)}</div>
-            <div className="text-[10px] text-muted-foreground mt-1">
-              {anyD2Applied ? "Clause (j) 5% applied on partial personal items" : "No partial personal element declared"}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-green-500/5 border-green-500/20 dark:bg-green-950/10">
-          <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground font-medium">Net Eligible ITC Claimed</div>
-            <div className="num text-xl font-bold text-green-700 dark:text-green-400 mt-1">{formatINR(sumEligible)}</div>
-            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
-              <span>I:{formatINR(totEligible.igst)}</span>
-              <span>C:{formatINR(totEligible.cgst)}</span>
-              <span>S:{formatINR(totEligible.sgst)}</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Summary vs Detailed Report Switcher Bar */}
+      <div className="flex items-center justify-between gap-4 flex-wrap bg-card p-3 rounded-lg border shadow-sm no-print">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={reportType === "summary" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setReportType("summary")}
+            className="text-xs h-8 font-semibold"
+          >
+            <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+            Summary Report
+          </Button>
+          <Button
+            variant={reportType === "detailed" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setReportType("detailed")}
+            className="text-xs h-8 font-semibold"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Detailed Invoice Report ({filteredInvoices.length} Invoices)
+          </Button>
+        </div>
+        <div className="text-xs text-muted-foreground font-medium">
+          Period: <span className="font-bold text-foreground">{filterTitle(filter)}</span>
+        </div>
       </div>
-
-      {/* Head-wise ITC & Reversal Summary Card */}
-      <Card className="border-teal-500/30 bg-teal-500/5 dark:bg-teal-950/20 shadow-sm">
-        <CardHeader className="py-3 px-5 border-b border-teal-500/20 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-foreground">Head-wise Tax Reversal &amp; ITC Summary ({filterTitle(filter)})</h4>
+      {reportType === "summary" ? (
+        <>
+          {/* Summary totals block */}
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="py-4">
+                <div className="text-xs text-muted-foreground font-medium">Total Inward ITC (T)</div>
+                <div className="num text-xl font-bold text-primary mt-1">{formatINR(sumT)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+                  <span>I:{formatINR(totT.igst)}</span>
+                  <span>C:{formatINR(totT.cgst)}</span>
+                  <span>S:{formatINR(totT.sgst)}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-amber-500/5 border-amber-500/20">
+              <CardContent className="py-4">
+                <div className="text-xs text-muted-foreground font-medium">Exempt Reversal (D1)</div>
+                <div className="num text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{formatINR(sumD1)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Based on E/F ratio</div>
+              </CardContent>
+            </Card>
+            <Card className={`border-2 transition-all ${anyD2Applied ? "bg-rose-500/10 border-rose-500/40 shadow-sm" : "bg-muted/30 border-border"}`}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-rose-700 dark:text-rose-300">⭐ Non-Business Reversal (D2)</div>
+                  {anyD2Applied ? (
+                    <Badge variant="outline" className="text-[9px] bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-500/30">
+                      5% Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">
+                      0% (N/A)
+                    </Badge>
+                  )}
+                </div>
+                <div className="num text-xl font-black text-rose-600 dark:text-rose-400 mt-1">{formatINR(sumD2)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {anyD2Applied ? "Clause (j) 5% applied on partial personal items" : "No partial personal element declared"}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-green-500/5 border-green-500/20 dark:bg-green-950/10">
+              <CardContent className="py-4">
+                <div className="text-xs text-muted-foreground font-medium">Net Eligible ITC Claimed</div>
+                <div className="num text-xl font-bold text-green-700 dark:text-green-400 mt-1">{formatINR(sumEligible)}</div>
+                <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+                  <span>I:{formatINR(totEligible.igst)}</span>
+                  <span>C:{formatINR(totEligible.cgst)}</span>
+                  <span>S:{formatINR(totEligible.sgst)}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <span className="text-[11px] text-muted-foreground italic font-medium">Head-wise IGST / CGST / SGST Amount Breakdown</span>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="text-xs">
-                <TableHead className="font-bold text-foreground">Calculation Component</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">IGST (₹)</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">CGST (₹)</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">SGST (₹)</TableHead>
-                <TableHead className="text-right font-bold text-foreground">Total Amount (₹)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="text-xs font-medium">
-              <TableRow className="hover:bg-muted/30 font-semibold bg-muted/10">
-                <TableCell className="font-bold text-foreground">Total Inward ITC (T)</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT.igst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT.cgst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(sumT)}</TableCell>
-              </TableRow>
 
-              {/* Reversal Breakdown Section */}
-              <TableRow className="bg-destructive/5 border-t border-destructive/20">
-                <TableCell colSpan={5} className="font-bold text-destructive py-1.5 uppercase text-[10px] tracking-wider">
-                  🔻 INELIGIBLE &amp; REVERSAL BREAKDOWN
-                </TableCell>
-              </TableRow>
-              <TableRow className="hover:bg-destructive/5 text-destructive">
-                <TableCell className="pl-6 font-medium">Exclusive Non-Business Reversal (T1)</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT1.igst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT1.cgst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT1.sgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.igst + totT1.cgst + totT1.sgst)}</TableCell>
-              </TableRow>
-              <TableRow className="hover:bg-destructive/5 text-destructive">
-                <TableCell className="pl-6 font-medium">Exclusive Exempt Reversal (T2)</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT2.igst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT2.cgst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT2.sgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT2.igst + totT2.cgst + totT2.sgst)}</TableCell>
-              </TableRow>
-              <TableRow className="hover:bg-destructive/5 text-destructive">
-                <TableCell className="pl-6 font-medium">Blocked Credit u/s 17(5) Reversal (T3)</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT3.igst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT3.cgst)}</TableCell>
-                <TableCell className="text-right num">{formatINRPrecise(totT3.sgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT3.igst + totT3.cgst + totT3.sgst)}</TableCell>
-              </TableRow>
-              <TableRow className="hover:bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                <TableCell className="pl-6 font-medium">Common Exempt Supplies Reversal (D1)</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD1.cgst + totD1.sgst)}</TableCell>
-              </TableRow>
-              <TableRow className="hover:bg-rose-500/10 text-rose-700 dark:text-rose-400">
-                <TableCell className="pl-6 font-medium">⭐ Common Non-Business Reversal (D2 - 5%)</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.cgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst + totD2.cgst + totD2.sgst)}</TableCell>
-              </TableRow>
+          {/* Head-wise ITC & Reversal Summary Card */}
+          <Card className="border-teal-500/30 bg-teal-500/5 dark:bg-teal-950/20 shadow-sm">
+            <CardHeader className="py-3 px-5 border-b border-teal-500/20 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-foreground">Head-wise Tax Reversal &amp; ITC Summary ({filterTitle(filter)})</h4>
+              </div>
+              <span className="text-[11px] text-muted-foreground italic font-medium">Head-wise IGST / CGST / SGST Amount Breakdown</span>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow className="text-xs">
+                    <TableHead className="font-bold text-foreground">Calculation Component</TableHead>
+                    <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">IGST (₹)</TableHead>
+                    <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">CGST (₹)</TableHead>
+                    <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">SGST (₹)</TableHead>
+                    <TableHead className="text-right font-bold text-foreground">Total Amount (₹)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="text-xs font-medium">
+                  <TableRow className="hover:bg-muted/30 font-semibold bg-muted/10">
+                    <TableCell className="font-bold text-foreground">Total Inward ITC (T)</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT.igst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT.cgst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT.sgst)}</TableCell>
+                    <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(sumT)}</TableCell>
+                  </TableRow>
 
-              {/* Total of All Reversals */}
-              <TableRow className="hover:bg-destructive/20 bg-destructive/15 text-destructive font-black border-y-2 border-destructive/30">
-                <TableCell className="font-black">🔴 TOTAL OF ALL REVERSALS (T1 + T2 + T3 + D1 + D2)</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.igst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.cgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.sgst)}</TableCell>
-                <TableCell className="text-right num font-black text-sm">{formatINRPrecise(sumReversal)}</TableCell>
-              </TableRow>
-
-              {/* Net Eligible Claimed ITC */}
-              <TableRow className="hover:bg-green-500/20 bg-green-500/10 font-bold text-green-700 dark:text-green-300 text-sm">
-                <TableCell className="font-black">🟢 NET ELIGIBLE CLAIMED ITC (T4 + C3)</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.igst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.cgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.sgst)}</TableCell>
-                <TableCell className="text-right num font-black text-base">{formatINRPrecise(sumEligible)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Apportionment breakdown table */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
-          <div>
-            <CardTitle className="text-base">Rule 42 Apportionment Schedule</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">Monthly calculations on Inputs &amp; Input Services</p>
-          </div>
-          <div className="flex gap-2 no-print">
-            <Button variant="outline" size="sm" onClick={handleExcel}><Download className="h-3.5 w-3.5 mr-1.5" />Excel</Button>
-            <Button variant="outline" size="sm" onClick={handlePdf}><Printer className="h-3.5 w-3.5 mr-1.5" />PDF</Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto max-h-[460px] overflow-y-auto w-full">
-            <Table className="min-w-[1200px]">
-              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
-                <TableRow>
-                  <TableHead className="w-[110px]">Month</TableHead>
-                  <TableHead className="text-right">Total ITC (T)</TableHead>
-                  <TableHead className="text-right text-destructive">Non-Bus (T1)</TableHead>
-                  <TableHead className="text-right text-destructive">Exempt (T2)</TableHead>
-                  <TableHead className="text-right text-destructive">Blocked (T3)</TableHead>
-                  <TableHead className="text-right font-medium">Ledger (C1)</TableHead>
-                  <TableHead className="text-right text-green-600">Taxable (T4)</TableHead>
-                  <TableHead className="text-right font-medium">Common (C2)</TableHead>
-                  <TableHead className="text-right">Ratio (E/F)</TableHead>
-                  <TableHead className="text-right text-destructive bg-destructive/5">Exempt Rev (D1)</TableHead>
-                  <TableHead className="text-right text-rose-600 font-bold bg-rose-500/10 border-x border-rose-500/20">⭐ Non-Bus Rev (D2)</TableHead>
-                  <TableHead className="text-right text-green-600 font-semibold bg-green-500/5">Net Eligible</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={12} className="py-12 text-center text-sm text-muted-foreground italic">
-                      No Inputs &amp; Services found in this reporting window.
+                  {/* Reversal Breakdown Section */}
+                  <TableRow className="bg-destructive/5 border-t border-destructive/20">
+                    <TableCell colSpan={5} className="font-bold text-destructive py-1.5 uppercase text-[10px] tracking-wider">
+                      🔻 INELIGIBLE &amp; REVERSAL BREAKDOWN
                     </TableCell>
                   </TableRow>
-                ) : (
-                  rows.map((r) => {
-                    const tVal = r.totalItc.igst + r.totalItc.cgst + r.totalItc.sgst;
-                    const t1Val = r.t1.igst + r.t1.cgst + r.t1.sgst;
-                    const t2Val = r.t2.igst + r.t2.cgst + r.t2.sgst;
-                    const t3Val = r.t3.igst + r.t3.cgst + r.t3.sgst;
-                    const c1Val = r.c1.igst + r.c1.cgst + r.c1.sgst;
-                    const t4Val = r.t4.igst + r.t4.cgst + r.t4.sgst;
-                    const c2Val = r.c2.igst + r.c2.cgst + r.c2.sgst;
-                    const d1Val = r.d1.igst + r.d1.cgst + r.d1.sgst;
-                    const d2Val = r.d2.igst + r.d2.cgst + r.d2.sgst;
-                    const eligVal = r.eligibleItc.igst + r.eligibleItc.cgst + r.eligibleItc.sgst;
+                  <TableRow className="hover:bg-destructive/5 text-destructive">
+                    <TableCell className="pl-6 font-medium">Exclusive Non-Business Reversal (T1)</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT1.igst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT1.cgst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT1.sgst)}</TableCell>
+                    <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.igst + totT1.cgst + totT1.sgst)}</TableCell>
+                  </TableRow>
+                  <TableRow className="hover:bg-destructive/5 text-destructive">
+                    <TableCell className="pl-6 font-medium">Exclusive Exempt Reversal (T2)</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT2.igst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT2.cgst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT2.sgst)}</TableCell>
+                    <TableCell className="text-right num font-semibold">{formatINRPrecise(totT2.igst + totT2.cgst + totT2.sgst)}</TableCell>
+                  </TableRow>
+                  <TableRow className="hover:bg-destructive/5 text-destructive">
+                    <TableCell className="pl-6 font-medium">Blocked Credit u/s 17(5) Reversal (T3)</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT3.igst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT3.cgst)}</TableCell>
+                    <TableCell className="text-right num">{formatINRPrecise(totT3.sgst)}</TableCell>
+                    <TableCell className="text-right num font-semibold">{formatINRPrecise(totT3.igst + totT3.cgst + totT3.sgst)}</TableCell>
+                  </TableRow>
+                  <TableRow className="hover:bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                    <TableCell className="pl-6 font-medium">Common Exempt Supplies Reversal (D1)</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD1.cgst + totD1.sgst)}</TableCell>
+                  </TableRow>
+                  <TableRow className="hover:bg-rose-500/10 text-rose-700 dark:text-rose-400">
+                    <TableCell className="pl-6 font-medium">⭐ Common Non-Business Reversal (D2 - 5%)</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.cgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.sgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst + totD2.cgst + totD2.sgst)}</TableCell>
+                  </TableRow>
 
-                    return (
-                      <TableRow key={r.monthKey} className="hover:bg-muted/40 text-xs">
-                        <TableCell className="font-medium">{r.monthLabel}</TableCell>
-                        <TableCell className="text-right num font-semibold">{formatINR(tVal)}</TableCell>
-                        <TableCell className="text-right num text-destructive">{t1Val > 0 ? formatINR(t1Val) : "—"}</TableCell>
-                        <TableCell className="text-right num text-destructive">{t2Val > 0 ? formatINR(t2Val) : "—"}</TableCell>
-                        <TableCell className="text-right num text-destructive">{t3Val > 0 ? formatINR(t3Val) : "—"}</TableCell>
-                        <TableCell className="text-right num font-medium">{formatINR(c1Val)}</TableCell>
-                        <TableCell className="text-right num text-green-700 dark:text-green-400">{t4Val > 0 ? formatINR(t4Val) : "—"}</TableCell>
-                        <TableCell className="text-right num font-medium">{formatINR(c2Val)}</TableCell>
-                        <TableCell className="text-right num">{(r.exemptRatio * 100).toFixed(1)}%</TableCell>
-                        <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d1Val)}</TableCell>
-                        <TableCell className={`text-right num font-bold ${r.d2Applied ? "text-rose-700 dark:text-rose-300 bg-rose-500/15 border-x border-rose-500/30" : "text-muted-foreground bg-muted/20"}`}>
-                          {formatINRPrecise(d2Val)}
-                          <span className={`text-[9px] block font-mono ${r.d2Applied ? "text-rose-600 dark:text-rose-400 font-bold" : "text-muted-foreground"}`}>
-                            {r.d2Applied ? "5% Applied" : "0% (N/A)"}
-                          </span>
+                  {/* Total of All Reversals */}
+                  <TableRow className="hover:bg-destructive/20 bg-destructive/15 text-destructive font-black border-y-2 border-destructive/30">
+                    <TableCell className="font-black">🔴 TOTAL OF ALL REVERSALS (T1 + T2 + T3 + D1 + D2)</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.igst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.cgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.sgst)}</TableCell>
+                    <TableCell className="text-right num font-black text-sm">{formatINRPrecise(sumReversal)}</TableCell>
+                  </TableRow>
+
+                  {/* Net Eligible Claimed ITC */}
+                  <TableRow className="hover:bg-green-500/20 bg-green-500/10 font-bold text-green-700 dark:text-green-300 text-sm">
+                    <TableCell className="font-black">🟢 NET ELIGIBLE CLAIMED ITC (T4 + C3)</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.igst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.cgst)}</TableCell>
+                    <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.sgst)}</TableCell>
+                    <TableCell className="text-right num font-black text-base">{formatINRPrecise(sumEligible)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Apportionment breakdown table */}
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
+              <div>
+                <CardTitle className="text-base">Rule 42 Apportionment Schedule</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Monthly calculations on Inputs &amp; Input Services</p>
+              </div>
+              <div className="flex gap-2 no-print">
+                <Button variant="outline" size="sm" onClick={handleExcel}><Download className="h-3.5 w-3.5 mr-1.5" />Excel Summary</Button>
+                <Button variant="outline" size="sm" onClick={handlePdf}><Printer className="h-3.5 w-3.5 mr-1.5" />PDF Summary</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto max-h-[460px] overflow-y-auto w-full">
+                <Table className="min-w-[1200px]">
+                  <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
+                    <TableRow>
+                      <TableHead className="w-[110px]">Month</TableHead>
+                      <TableHead className="text-right">Total ITC (T)</TableHead>
+                      <TableHead className="text-right text-destructive">Non-Bus (T1)</TableHead>
+                      <TableHead className="text-right text-destructive">Exempt (T2)</TableHead>
+                      <TableHead className="text-right text-destructive">Blocked (T3)</TableHead>
+                      <TableHead className="text-right font-medium">Ledger (C1)</TableHead>
+                      <TableHead className="text-right text-green-600">Taxable (T4)</TableHead>
+                      <TableHead className="text-right font-medium">Common (C2)</TableHead>
+                      <TableHead className="text-right">Ratio (E/F)</TableHead>
+                      <TableHead className="text-right text-destructive bg-destructive/5">Exempt Rev (D1)</TableHead>
+                      <TableHead className="text-right text-rose-600 font-bold bg-rose-500/10 border-x border-rose-500/20">⭐ Non-Bus Rev (D2)</TableHead>
+                      <TableHead className="text-right text-green-600 font-semibold bg-green-500/5">Net Eligible</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={12} className="py-12 text-center text-sm text-muted-foreground italic">
+                          No Inputs &amp; Services found in this reporting window.
                         </TableCell>
-                        <TableCell className="text-right num text-green-700 dark:text-green-400 bg-green-500/5 font-bold text-sm">{formatINRPrecise(eligVal)}</TableCell>
                       </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                    ) : (
+                      rows.map((r) => {
+                        const tVal = r.totalItc.igst + r.totalItc.cgst + r.totalItc.sgst;
+                        const t1Val = r.t1.igst + r.t1.cgst + r.t1.sgst;
+                        const t2Val = r.t2.igst + r.t2.cgst + r.t2.sgst;
+                        const t3Val = r.t3.igst + r.t3.cgst + r.t3.sgst;
+                        const c1Val = r.c1.igst + r.c1.cgst + r.c1.sgst;
+                        const t4Val = r.t4.igst + r.t4.cgst + r.t4.sgst;
+                        const c2Val = r.c2.igst + r.c2.cgst + r.c2.sgst;
+                        const d1Val = r.d1.igst + r.d1.cgst + r.d1.sgst;
+                        const d2Val = r.d2.igst + r.d2.cgst + r.d2.sgst;
+                        const eligVal = r.eligibleItc.igst + r.eligibleItc.cgst + r.eligibleItc.sgst;
+
+                        return (
+                          <TableRow key={r.monthKey} className="hover:bg-muted/40 text-xs">
+                            <TableCell className="font-medium">{r.monthLabel}</TableCell>
+                            <TableCell className="text-right num font-semibold">{formatINR(tVal)}</TableCell>
+                            <TableCell className="text-right num text-destructive">{t1Val > 0 ? formatINR(t1Val) : "—"}</TableCell>
+                            <TableCell className="text-right num text-destructive">{t2Val > 0 ? formatINR(t2Val) : "—"}</TableCell>
+                            <TableCell className="text-right num text-destructive">{t3Val > 0 ? formatINR(t3Val) : "—"}</TableCell>
+                            <TableCell className="text-right num font-medium">{formatINR(c1Val)}</TableCell>
+                            <TableCell className="text-right num text-green-700 dark:text-green-400">{t4Val > 0 ? formatINR(t4Val) : "—"}</TableCell>
+                            <TableCell className="text-right num font-medium">{formatINR(c2Val)}</TableCell>
+                            <TableCell className="text-right num">{(r.exemptRatio * 100).toFixed(1)}%</TableCell>
+                            <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d1Val)}</TableCell>
+                            <TableCell className={`text-right num font-bold ${r.d2Applied ? "text-rose-700 dark:text-rose-300 bg-rose-500/15 border-x border-rose-500/30" : "text-muted-foreground bg-muted/20"}`}>
+                              {formatINRPrecise(d2Val)}
+                              <span className={`text-[9px] block font-mono ${r.d2Applied ? "text-rose-600 dark:text-rose-400 font-bold" : "text-muted-foreground"}`}>
+                                {r.d2Applied ? "5% Applied" : "0% (N/A)"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right num text-green-700 dark:text-green-400 bg-green-500/5 font-bold text-sm">{formatINRPrecise(eligVal)}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        /* Detailed Invoice Register View */
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
+            <div>
+              <CardTitle className="text-base">Detailed Itemized Invoices ({filteredInvoices.length})</CardTitle>
+              <CardDescription className="text-xs">
+                Complete purchase invoice register for Inputs &amp; Services in {filterTitle(filter)}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 no-print">
+              <Button variant="outline" size="sm" onClick={() => exportRegisterXlsx(filteredInvoices, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`)}>
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Excel Register
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportRegisterPdf(filteredInvoices, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`)}>
+                <Printer className="h-3.5 w-3.5 mr-1.5" />
+                PDF Register
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto max-h-[550px] overflow-y-auto w-full">
+              <Table className="min-w-[1100px]">
+                <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
+                  <TableRow className="text-xs">
+                    <TableHead className="w-[100px]">Date</TableHead>
+                    <TableHead className="w-[120px]">Invoice No</TableHead>
+                    <TableHead className="w-[180px]">Supplier Name</TableHead>
+                    <TableHead className="w-[140px]">GSTIN</TableHead>
+                    <TableHead className="w-[140px]">Description</TableHead>
+                    <TableHead className="text-right">Taxable Val (₹)</TableHead>
+                    <TableHead className="text-right">IGST (₹)</TableHead>
+                    <TableHead className="text-right">CGST (₹)</TableHead>
+                    <TableHead className="text-right">SGST (₹)</TableHead>
+                    <TableHead className="text-center">Business Usage</TableHead>
+                    <TableHead className="text-center">Personal Classification</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="py-12 text-center text-sm text-muted-foreground italic">
+                        No purchase invoices found for this selected period ({filterTitle(filter)}).
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredInvoices.map((inv) => (
+                      <TableRow key={inv.id} className="hover:bg-muted/40 text-xs">
+                        <TableCell className="font-mono text-[11px]">{inv.purchaseDate}</TableCell>
+                        <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
+                        <TableCell className="truncate max-w-[180px]" title={inv.supplierName}>{inv.supplierName || "—"}</TableCell>
+                        <TableCell className="font-mono text-[11px]">{inv.supplierGstin || "—"}</TableCell>
+                        <TableCell className="truncate max-w-[140px]" title={inv.assetDescription}>{inv.assetDescription || "Input Service"}</TableCell>
+                        <TableCell className="text-right num font-medium">{formatINR(inv.taxableValue)}</TableCell>
+                        <TableCell className="text-right num">{inv.igst > 0 ? formatINR(inv.igst) : "—"}</TableCell>
+                        <TableCell className="text-right num">{inv.cgst > 0 ? formatINR(inv.cgst) : "—"}</TableCell>
+                        <TableCell className="text-right num">{inv.sgst > 0 ? formatINR(inv.sgst) : "—"}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={`text-[10px] ${inv.usageType === "taxable" ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30" : inv.usageType === "exempt" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" : "bg-primary/10 text-primary border-primary/30"}`}>
+                            {inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : "Common Use (C2)"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {inv.nonBusinessUse === "100_personal" ? (
+                            <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">100% Personal (T1)</Badge>
+                          ) : inv.nonBusinessUse === "partial_personal" ? (
+                            <Badge variant="outline" className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30">Partial Personal (D2)</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">100% Business</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

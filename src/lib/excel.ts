@@ -653,28 +653,45 @@ export async function exportRule42Xlsx(
   sub.alignment = { horizontal: "center" };
   ws.getRow(2).height = 20;
 
-  const summary = [
-    ["Total Inward ITC (T)", opts.totalT],
-    ["Total ITC Reversal (D1 + D2)", opts.totalReversal],
-    ["Net Eligible ITC Claimed", opts.totalEligible],
+  const getSumHead = (field: "totalItc" | "t1" | "t2" | "t3" | "c1" | "t4" | "c2" | "d1" | "d2" | "eligibleItc" | "totalReversal", head: "igst" | "cgst" | "sgst") => {
+    return opts.rows.reduce((sum, r) => sum + ((r[field] && r[field][head]) || 0), 0);
+  };
+
+  const headSummaryRows = [
+    ["Calculation Component", "IGST (Rs.)", "CGST (Rs.)", "SGST (Rs.)", "Total Amount (Rs.)"],
+    ["Total Inward ITC (T)", getSumHead("totalItc", "igst"), getSumHead("totalItc", "cgst"), getSumHead("totalItc", "sgst"), opts.totalT],
+    ["Exclusive Non-Business Reversal (T1)", getSumHead("t1", "igst"), getSumHead("t1", "cgst"), getSumHead("t1", "sgst"), getSumHead("t1", "igst") + getSumHead("t1", "cgst") + getSumHead("t1", "sgst")],
+    ["Exclusive Exempt Reversal (T2)", getSumHead("t2", "igst"), getSumHead("t2", "cgst"), getSumHead("t2", "sgst"), getSumHead("t2", "igst") + getSumHead("t2", "cgst") + getSumHead("t2", "sgst")],
+    ["Blocked Credit u/s 17(5) Reversal (T3)", getSumHead("t3", "igst"), getSumHead("t3", "cgst"), getSumHead("t3", "sgst"), getSumHead("t3", "igst") + getSumHead("t3", "cgst") + getSumHead("t3", "sgst")],
+    ["Common Exempt Supplies Reversal (D1)", getSumHead("d1", "igst"), getSumHead("d1", "cgst"), getSumHead("d1", "sgst"), getSumHead("d1", "igst") + getSumHead("d1", "cgst") + getSumHead("d1", "sgst")],
+    ["⭐ Common Non-Business Reversal (D2 - 5%)", getSumHead("d2", "igst"), getSumHead("d2", "cgst"), getSumHead("d2", "sgst"), getSumHead("d2", "igst") + getSumHead("d2", "cgst") + getSumHead("d2", "sgst")],
+    ["TOTAL OF ALL REVERSALS (T1+T2+T3+D1+D2)", getSumHead("totalReversal", "igst"), getSumHead("totalReversal", "cgst"), getSumHead("totalReversal", "sgst"), opts.totalReversal],
+    ["NET ELIGIBLE CLAIMED ITC (T4+C3)", getSumHead("eligibleItc", "igst"), getSumHead("eligibleItc", "cgst"), getSumHead("eligibleItc", "sgst"), opts.totalEligible],
   ];
+
   let r = 4;
-  for (const [label, value] of summary) {
-    const c1 = ws.getCell(`A${r}`); c1.value = label; applySubhead(c1);
-    ws.mergeCells(`A${r}:D${r}`);
-    const c2 = ws.getCell(`E${r}`); c2.value = value;
-    if (typeof value === "number") {
-      applyMoneyFormat(c2);
-      c2.font = {
-        bold: true,
-        color: {
-          argb: label.includes("Reversal") ? "FFB91C1C" : label.includes("Net") ? "FF15803D" : HEADER_GREY
+  headSummaryRows.forEach((row, rowIdx) => {
+    row.forEach((val, colIdx) => {
+      const cell = ws.getCell(r, colIdx + 1);
+      cell.value = val;
+      if (rowIdx === 0) {
+        applyHeader(cell);
+      } else {
+        if (colIdx > 0 && typeof val === "number") applyMoneyFormat(cell);
+        if (rowIdx >= 2 && rowIdx <= 6) cell.font = { color: { argb: "FFB91C1C" }, bold: true };
+        if (rowIdx === 7) {
+          cell.font = { color: { argb: "FFB91C1C" }, bold: true };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEE2E2" } };
         }
-      };
-    }
+        if (rowIdx === 8) {
+          cell.font = { color: { argb: "FF15803D" }, bold: true };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+        }
+      }
+    });
     r++;
-  }
-  r++;
+  });
+  r += 2;
 
   const headers = [
     "Month", "Total ITC (T)", "Non-Bus (T1)", "Exempt (T2)", "Blocked (T3)",
