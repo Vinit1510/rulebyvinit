@@ -157,7 +157,6 @@ export async function uploadTaxDataFile(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": `multipart/related; boundary=${boundary}`,
-        "Content-Length": String(multipartRequestBody.length),
       },
       body: multipartRequestBody,
     });
