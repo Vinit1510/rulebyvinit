@@ -63,32 +63,37 @@ export function AuthPage() {
 
         <Card className="border border-border/80 shadow-md">
           <CardHeader className="pb-4 text-center">
-            <CardTitle className="text-lg">Secure Google Drive Sync</CardTitle>
-            <CardDescription className="text-xs">
+            <div className="flex items-center justify-center gap-2">
+              <CardTitle className="text-lg">Secure Google Drive Sync</CardTitle>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                Coming Soon
+              </span>
+            </div>
+            <CardDescription className="text-xs mt-1">
               Your financial records are saved directly in your personal cloud. No third-party servers.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
               type="button"
-              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200"
-              onClick={signIn}
-              disabled={loading || !clientId}
+              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200 opacity-80"
+              onClick={() => {
+                toast({
+                  title: "Google Drive Sync — Coming Soon!",
+                  description: "Google Cloud Sync is currently under development. Please click 'Continue Offline (Local Sandbox)' below to use the application.",
+                });
+              }}
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <GoogleIcon />
-                  <span>Continue with Google</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <GoogleIcon />
+                <span>Continue with Google (Coming Soon)</span>
+              </div>
             </Button>
 
             <Button
               type="button"
               variant="outline"
-              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200 border-dashed"
+              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200 border-dashed border-primary/40 bg-primary/5"
               onClick={() => {
                 if (typeof window !== "undefined") {
                   localStorage.setItem("r43_working_offline", "true");

@@ -217,23 +217,69 @@ function Rule42MonthlyReport({
     exportRule42Xlsx({
       filterTitle: filterTitle(filter),
       totalT: sumT,
-      totalReversal: sumReversal,
-      totalEligible: sumEligible,
-      rows: rows,
     }, filename);
   };
 
-  const [reportType, setReportType] = useState<"summary" | "detailed">("summary");
+  const detailedInvoiceRows = useMemo(() => {
+    const monthResultMap = new Map<string, Rule42MonthResult>();
+    for (const r of rows) {
+      monthResultMap.set(r.monthKey, r);
+    }
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      if ((inv.itemType ?? "capital_good") === "capital_good") return false;
-      if (!inv.purchaseDate) return false;
-      const d = new Date(inv.purchaseDate);
-      if (isNaN(d.getTime())) return false;
-      return inFilter(d, filter);
+    return filteredInvoices.map((inv) => {
+      const totTax = (inv.igst || 0) + (inv.cgst || 0) + (inv.sgst || 0);
+      let t1 = 0, t2 = 0, t3 = 0, d1 = 0, d2 = 0;
+
+      if (inv.nonBusinessUse === "100_personal") {
+        t1 = totTax;
+      } else if (inv.usageType === "exempt") {
+        t2 = totTax;
+      } else if (inv.usageType === "taxable") {
+        // T4 - 100% Taxable
+      } else {
+        // Common C2
+        const d = inv.purchaseDate ? new Date(inv.purchaseDate) : null;
+        if (d && !isNaN(d.getTime())) {
+          const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          const mRes = monthResultMap.get(mk);
+          const ratio = mRes ? mRes.exemptRatio : 0;
+          d1 = totTax * ratio;
+          if (inv.nonBusinessUse === "partial_personal") {
+            d2 = totTax * 0.05;
+          }
+        }
+      }
+
+      const reversalAmt = t1 + t2 + t3 + d1 + d2;
+      const netClaimAmt = Math.max(0, totTax - reversalAmt);
+
+      return {
+        inv,
+        totTax,
+        t1,
+        t2,
+        t3,
+        d1,
+        d2,
+        reversalAmt,
+        netClaimAmt,
+      };
     });
-  }, [invoices, filter]);
+  }, [filteredInvoices, rows]);
+
+  const detailedTotals = useMemo(() => {
+    let taxableVal = 0, igst = 0, cgst = 0, sgst = 0, totalTax = 0, reversal = 0, netClaim = 0;
+    for (const item of detailedInvoiceRows) {
+      taxableVal += item.inv.taxableValue || 0;
+      igst += item.inv.igst || 0;
+      cgst += item.inv.cgst || 0;
+      sgst += item.inv.sgst || 0;
+      totalTax += item.totTax;
+      reversal += item.reversalAmt;
+      netClaim += item.netClaimAmt;
+    }
+    return { taxableVal, igst, cgst, sgst, totalTax, reversal, netClaim };
+  }, [detailedInvoiceRows]);
 
   return (
     <div className="space-y-5">
@@ -265,6 +311,7 @@ function Rule42MonthlyReport({
           Period: <span className="font-bold text-foreground">{filterTitle(filter)}</span>
         </div>
       </div>
+
       {reportType === "summary" ? (
         <>
           {/* Summary totals block */}
@@ -515,59 +562,86 @@ function Rule42MonthlyReport({
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto max-h-[550px] overflow-y-auto w-full">
-              <Table className="min-w-[1100px]">
+              <Table className="min-w-[1250px]">
                 <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                   <TableRow className="text-xs">
-                    <TableHead className="w-[100px]">Date</TableHead>
-                    <TableHead className="w-[120px]">Invoice No</TableHead>
-                    <TableHead className="w-[180px]">Supplier Name</TableHead>
-                    <TableHead className="w-[140px]">GSTIN</TableHead>
-                    <TableHead className="w-[140px]">Description</TableHead>
+                    <TableHead className="w-[90px]">Date</TableHead>
+                    <TableHead className="w-[110px]">Invoice No</TableHead>
+                    <TableHead className="w-[160px]">Supplier Name</TableHead>
+                    <TableHead className="w-[120px]">GSTIN</TableHead>
+                    <TableHead className="w-[130px]">Description</TableHead>
                     <TableHead className="text-right">Taxable Val (₹)</TableHead>
                     <TableHead className="text-right">IGST (₹)</TableHead>
                     <TableHead className="text-right">CGST (₹)</TableHead>
                     <TableHead className="text-right">SGST (₹)</TableHead>
-                    <TableHead className="text-center">Business Usage</TableHead>
-                    <TableHead className="text-center">Personal Classification</TableHead>
+                    <TableHead className="text-right font-bold">Total Tax (₹)</TableHead>
+                    <TableHead className="text-center">Classification</TableHead>
+                    <TableHead className="text-right text-destructive font-bold">Reversal (₹)</TableHead>
+                    <TableHead className="text-right text-green-600 font-bold">Net Eligible (₹)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.length === 0 ? (
+                  {detailedInvoiceRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="py-12 text-center text-sm text-muted-foreground italic">
+                      <TableCell colSpan={13} className="py-12 text-center text-sm text-muted-foreground italic">
                         No purchase invoices found for this selected period ({filterTitle(filter)}).
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredInvoices.map((inv) => (
+                    detailedInvoiceRows.map(({ inv, totTax, reversalAmt, netClaimAmt }) => (
                       <TableRow key={inv.id} className="hover:bg-muted/40 text-xs">
                         <TableCell className="font-mono text-[11px]">{inv.purchaseDate}</TableCell>
                         <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
-                        <TableCell className="truncate max-w-[180px]" title={inv.supplierName}>{inv.supplierName || "—"}</TableCell>
+                        <TableCell className="truncate max-w-[160px]" title={inv.supplierName}>{inv.supplierName || "—"}</TableCell>
                         <TableCell className="font-mono text-[11px]">{inv.supplierGstin || "—"}</TableCell>
-                        <TableCell className="truncate max-w-[140px]" title={inv.assetDescription}>{inv.assetDescription || "Input Service"}</TableCell>
+                        <TableCell className="truncate max-w-[130px]" title={inv.assetDescription}>{inv.assetDescription || "Input Service"}</TableCell>
                         <TableCell className="text-right num font-medium">{formatINR(inv.taxableValue)}</TableCell>
                         <TableCell className="text-right num">{inv.igst > 0 ? formatINR(inv.igst) : "—"}</TableCell>
                         <TableCell className="text-right num">{inv.cgst > 0 ? formatINR(inv.cgst) : "—"}</TableCell>
                         <TableCell className="text-right num">{inv.sgst > 0 ? formatINR(inv.sgst) : "—"}</TableCell>
+                        <TableCell className="text-right num font-semibold">{formatINR(totTax)}</TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={`text-[10px] ${inv.usageType === "taxable" ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30" : inv.usageType === "exempt" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" : "bg-primary/10 text-primary border-primary/30"}`}>
-                            {inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : "Common Use (C2)"}
-                          </Badge>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${inv.usageType === "taxable" ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30" : inv.usageType === "exempt" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" : "bg-primary/10 text-primary border-primary/30"}`}>
+                              {inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : "Common Use (C2)"}
+                            </Badge>
+                            {inv.nonBusinessUse === "100_personal" && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-destructive/15 text-destructive border-destructive/30">100% Personal (T1)</Badge>
+                            )}
+                            {inv.nonBusinessUse === "partial_personal" && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30">Partial Personal (D2)</Badge>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-center">
-                          {inv.nonBusinessUse === "100_personal" ? (
-                            <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">100% Personal (T1)</Badge>
-                          ) : inv.nonBusinessUse === "partial_personal" ? (
-                            <Badge variant="outline" className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30">Partial Personal (D2)</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">100% Business</Badge>
-                          )}
+                        <TableCell className="text-right num text-destructive font-medium">
+                          {reversalAmt > 0 ? formatINRPrecise(reversalAmt) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right num text-green-700 dark:text-green-400 font-bold bg-green-500/5">
+                          {formatINRPrecise(netClaimAmt)}
                         </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
+                {detailedInvoiceRows.length > 0 && (
+                  <tfoot className="bg-muted/50 border-t-2 border-border font-bold">
+                    <TableRow className="text-xs">
+                      <TableCell colSpan={5} className="font-bold text-foreground">
+                        TOTAL ({filteredInvoices.length} Invoices)
+                      </TableCell>
+                      <TableCell className="text-right num font-bold">{formatINRPrecise(detailedTotals.taxableVal)}</TableCell>
+                      <TableCell className="text-right num font-bold">{formatINRPrecise(detailedTotals.igst)}</TableCell>
+                      <TableCell className="text-right num font-bold">{formatINRPrecise(detailedTotals.cgst)}</TableCell>
+                      <TableCell className="text-right num font-bold">{formatINRPrecise(detailedTotals.sgst)}</TableCell>
+                      <TableCell className="text-right num font-black text-sm">{formatINRPrecise(detailedTotals.totalTax)}</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-right num font-bold text-destructive">{formatINRPrecise(detailedTotals.reversal)}</TableCell>
+                      <TableCell className="text-right num font-black text-green-700 dark:text-green-400 text-sm bg-green-500/10">
+                        {formatINRPrecise(detailedTotals.netClaim)}
+                      </TableCell>
+                    </TableRow>
+                  </tfoot>
+                )}
               </Table>
             </div>
           </CardContent>
