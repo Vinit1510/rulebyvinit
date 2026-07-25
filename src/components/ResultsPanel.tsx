@@ -293,6 +293,42 @@ function Rule42MonthlyReport({
     return { taxableVal, igst, cgst, sgst, totalTax, reversal, netClaim };
   }, [detailedInvoiceRows]);
 
+  const handleDetailedExcel = async () => {
+    const regRows = detailedInvoiceRows.map(({ inv, totTax, netClaimAmt }) => ({
+      invoiceNo: inv.invoiceNumber || "—",
+      date: inv.purchaseDate || "—",
+      asset: inv.assetDescription || "Input Service",
+      supplier: inv.supplierName || "—",
+      gstin: inv.supplierGstin || "—",
+      taxableValue: inv.taxableValue || 0,
+      netItc: totTax,
+      igstRev: inv.igst || 0,
+      cgstRev: inv.cgst || 0,
+      sgstRev: inv.sgst || 0,
+      retained: netClaimAmt,
+      status: inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+    }));
+    await exportRegisterXlsx({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`);
+  };
+
+  const handleDetailedPdf = () => {
+    const regRows = detailedInvoiceRows.map(({ inv, totTax, netClaimAmt }) => ({
+      invoiceNo: inv.invoiceNumber || "—",
+      date: inv.purchaseDate || "—",
+      asset: inv.assetDescription || "Input Service",
+      supplier: inv.supplierName || "—",
+      gstin: inv.supplierGstin || "—",
+      taxableValue: inv.taxableValue || 0,
+      netItc: totTax,
+      igstRev: inv.igst || 0,
+      cgstRev: inv.cgst || 0,
+      sgstRev: inv.sgst || 0,
+      retained: netClaimAmt,
+      status: inv.usageType === "taxable" ? "Taxable Only (T4)" : inv.usageType === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+    }));
+    exportRegisterPdf({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`);
+  };
+
   return (
     <div className="space-y-5">
       <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
@@ -562,11 +598,11 @@ function Rule42MonthlyReport({
               </CardDescription>
             </div>
             <div className="flex gap-2 no-print">
-              <Button variant="outline" size="sm" onClick={() => exportRegisterXlsx(filteredInvoices, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`)}>
+              <Button variant="outline" size="sm" onClick={handleDetailedExcel}>
                 <Download className="h-3.5 w-3.5 mr-1.5" />
                 Excel Register
               </Button>
-              <Button variant="outline" size="sm" onClick={() => exportRegisterPdf(filteredInvoices, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`)}>
+              <Button variant="outline" size="sm" onClick={handleDetailedPdf}>
                 <Printer className="h-3.5 w-3.5 mr-1.5" />
                 PDF Register
               </Button>
