@@ -300,43 +300,68 @@ function Rule42MonthlyReport({
               </TableRow>
             </TableHeader>
             <TableBody className="text-xs font-medium">
-              <TableRow className="hover:bg-muted/30">
-                <TableCell className="font-medium">Total Inward ITC (T)</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.igst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.cgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.sgst)}</TableCell>
+              <TableRow className="hover:bg-muted/30 font-semibold bg-muted/10">
+                <TableCell className="font-bold text-foreground">Total Inward ITC (T)</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT.igst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT.cgst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT.sgst)}</TableCell>
                 <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(sumT)}</TableCell>
               </TableRow>
-              <TableRow className="hover:bg-muted/30">
-                <TableCell className="font-medium">Common Credit (C2)</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.igst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.cgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(totC2.igst + totC2.cgst + totC2.sgst)}</TableCell>
+
+              {/* Reversal Breakdown Section */}
+              <TableRow className="bg-destructive/5 border-t border-destructive/20">
+                <TableCell colSpan={5} className="font-bold text-destructive py-1.5 uppercase text-[10px] tracking-wider">
+                  🔻 INELIGIBLE &amp; REVERSAL BREAKDOWN
+                </TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-destructive/5 text-destructive">
+                <TableCell className="pl-6 font-medium">Exclusive Non-Business Reversal (T1)</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT1.igst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT1.cgst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT1.sgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.igst + totT1.cgst + totT1.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-destructive/5 text-destructive">
+                <TableCell className="pl-6 font-medium">Exclusive Exempt Reversal (T2)</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT2.igst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT2.cgst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT2.sgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT2.igst + totT2.cgst + totT2.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-destructive/5 text-destructive">
+                <TableCell className="pl-6 font-medium">Blocked Credit u/s 17(5) Reversal (T3)</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT3.igst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT3.cgst)}</TableCell>
+                <TableCell className="text-right num">{formatINRPrecise(totT3.sgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT3.igst + totT3.cgst + totT3.sgst)}</TableCell>
               </TableRow>
               <TableRow className="hover:bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                <TableCell className="font-medium">Exempt Reversal (D1)</TableCell>
+                <TableCell className="pl-6 font-medium">Common Exempt Supplies Reversal (D1)</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD1.cgst + totD1.sgst)}</TableCell>
               </TableRow>
               <TableRow className="hover:bg-rose-500/10 text-rose-700 dark:text-rose-400">
-                <TableCell className="font-medium">⭐ Non-Business Reversal (D2 - 5%)</TableCell>
+                <TableCell className="pl-6 font-medium">⭐ Common Non-Business Reversal (D2 - 5%)</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.cgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.sgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst + totD2.cgst + totD2.sgst)}</TableCell>
               </TableRow>
-              <TableRow className="hover:bg-destructive/10 bg-destructive/5 text-destructive font-bold">
-                <TableCell className="font-medium">Total ITC Reversal (D1 + D2)</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD2.igst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst + totD2.cgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst + totD2.sgst)}</TableCell>
+
+              {/* Total of All Reversals */}
+              <TableRow className="hover:bg-destructive/20 bg-destructive/15 text-destructive font-black border-y-2 border-destructive/30">
+                <TableCell className="font-black">🔴 TOTAL OF ALL REVERSALS (T1 + T2 + T3 + D1 + D2)</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.igst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.cgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totReversal.sgst)}</TableCell>
                 <TableCell className="text-right num font-black text-sm">{formatINRPrecise(sumReversal)}</TableCell>
               </TableRow>
+
+              {/* Net Eligible Claimed ITC */}
               <TableRow className="hover:bg-green-500/20 bg-green-500/10 font-bold text-green-700 dark:text-green-300 text-sm">
-                <TableCell>Net Eligible Claimed ITC</TableCell>
+                <TableCell className="font-black">🟢 NET ELIGIBLE CLAIMED ITC (T4 + C3)</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.igst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.cgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.sgst)}</TableCell>
