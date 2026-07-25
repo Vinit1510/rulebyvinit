@@ -32,6 +32,7 @@ import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface Props {
   invoices: Invoice[];
@@ -1181,22 +1182,30 @@ export function ResultsPanel({ invoices, turnover }: Props) {
           </TabsList>
 
           <TabsContent value="consolidated" className="mt-4">
-            <ConsolidatedReport
-              consol={consol}
-              invoices={invoices}
-              turnover={turnover}
-              filter={filter}
-              setFilter={setFilter}
-            />
+            <ErrorBoundary fallbackTitle="Error loading Rule 43 Consolidated Report">
+              <ConsolidatedReport
+                consol={consol}
+                invoices={invoices}
+                turnover={turnover}
+                filter={filter}
+                setFilter={setFilter}
+              />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="per-invoice" className="mt-4">
-            <PerInvoiceReport invoices={invoices} turnover={turnover} />
+            <ErrorBoundary fallbackTitle="Error loading Per-Invoice Report">
+              <PerInvoiceReport invoices={invoices} turnover={turnover} />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="register" className="mt-4">
-            <RegisterSummary invoices={invoices} turnover={turnover} />
+            <ErrorBoundary fallbackTitle="Error loading Register Summary">
+              <RegisterSummary invoices={invoices} turnover={turnover} />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="block-credit" className="mt-4">
-            <BlockCreditReport invoices={invoices} />
+            <ErrorBoundary fallbackTitle="Error loading Blocked Credit Report">
+              <BlockCreditReport invoices={invoices} />
+            </ErrorBoundary>
           </TabsContent>
         </Tabs>
       ) : reportType === "rule42" ? (
@@ -1207,22 +1216,28 @@ export function ResultsPanel({ invoices, turnover }: Props) {
           </TabsList>
 
           <TabsContent value="r42-monthly" className="mt-4">
-            <Rule42MonthlyReport
-              invoices={invoices}
-              turnover={turnover}
-              filter={filter}
-              setFilter={setFilter}
-            />
+            <ErrorBoundary fallbackTitle="Error loading Rule 42 Monthly Report">
+              <Rule42MonthlyReport
+                invoices={invoices}
+                turnover={turnover}
+                filter={filter}
+                setFilter={setFilter}
+              />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="r42-annual" className="mt-4">
-            <Rule42AnnualReconciliationReport
-              invoices={invoices}
-              turnover={turnover}
-            />
+            <ErrorBoundary fallbackTitle="Error loading Rule 42 Annual Reconciliation Report">
+              <Rule42AnnualReconciliationReport
+                invoices={invoices}
+                turnover={turnover}
+              />
+            </ErrorBoundary>
           </TabsContent>
         </Tabs>
       ) : (
-        <CombinedReversalsSummary invoices={invoices} turnover={turnover} />
+        <ErrorBoundary fallbackTitle="Error loading Combined Reversals Summary">
+          <CombinedReversalsSummary invoices={invoices} turnover={turnover} />
+        </ErrorBoundary>
       )}
     </div>
   );
