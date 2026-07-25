@@ -35,32 +35,41 @@ export function AuthPage() {
 
   useEffect(() => {
     if (isSignedIn) {
-      (async () => {
-        if (user?.email) {
-          logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
-        }
-        const settings = await getAdminSettings();
-        const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+      if (user?.email) {
+        logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
+      }
 
-        if (!settings.activationRequired) {
-          toast({
-            title: "Signed in successfully!",
-            description: "Google Drive Sync is active. Loading your dashboard...",
-          });
-          setLocation("/dashboard");
-        } else {
-          // Activation enforcement is ON: check if stored code is still active & valid for this email
-          if (storedCode) {
-            const check = await verifyActivationCode(storedCode, user?.email);
-            if (check.valid) {
-              setLocation("/dashboard");
-              return;
+      let isMounted = true;
+      getAdminSettings()
+        .then(async (settings) => {
+          if (!isMounted) return;
+          const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+
+          if (!settings.activationRequired) {
+            toast({
+              title: "Signed in successfully!",
+              description: "Google Drive Sync is active. Loading your dashboard...",
+            });
+            setLocation("/dashboard");
+          } else {
+            if (storedCode) {
+              const check = await verifyActivationCode(storedCode, user?.email);
+              if (check.valid) {
+                setLocation("/dashboard");
+                return;
+              }
             }
+            setShowActivationModal(true);
           }
-          // No stored code, or stored code was deactivated/revoked/deleted by admin!
-          setShowActivationModal(true);
-        }
-      })();
+        })
+        .catch((err) => {
+          console.error("Failed to check admin settings:", err);
+          if (isMounted) setLocation("/dashboard");
+        });
+
+      return () => {
+        isMounted = false;
+      };
     }
   }, [isSignedIn, setLocation, toast, user]);
 

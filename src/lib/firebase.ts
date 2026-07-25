@@ -54,10 +54,13 @@ function formatFirestoreFields(data: Record<string, any>): Record<string, any> {
   return fields;
 }
 
-/** Get Master Admin Settings */
+/** Get Master Admin Settings with 2.5s timeout */
 export async function getAdminSettings(): Promise<AdminSettings> {
   try {
-    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config`, { signal: controller.signal });
+    clearTimeout(timer);
     if (res.ok) {
       const doc = await res.json();
       const parsed = parseFirestoreDoc(doc);
