@@ -915,3 +915,128 @@ export async function exportRule42ReconXlsx(
   saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
+// ---------- Detailed Purchase Invoice Register (Rule 42) Excel Export ----------
+export interface DetailedRule42ItemRow {
+  date: string;
+  invoiceNo: string;
+  supplier: string;
+  gstin: string;
+  description: string;
+  taxableValue: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  totalTax: number;
+  classification: string;
+  reversalAmt: number;
+  netClaimAmt: number;
+}
+
+export async function exportDetailedRule42InvoicesXlsx(
+  opts: { filterTitle: string; rows: DetailedRule42ItemRow[] },
+  filename: string,
+) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Rule 42 ITC Calculator";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("Detailed Invoices (Rule 42)", { views: [{ state: "frozen", ySplit: 4 }] });
+  ws.columns = [
+    { width: 14 }, // Date
+    { width: 16 }, // Invoice No
+    { width: 26 }, // Supplier Name
+    { width: 18 }, // GSTIN
+    { width: 24 }, // Description
+    { width: 16 }, // Taxable Val
+    { width: 14 }, // IGST
+    { width: 14 }, // CGST
+    { width: 14 }, // SGST
+    { width: 16 }, // Total Tax
+    { width: 22 }, // Classification
+    { width: 16 }, // Reversal (₹)
+    { width: 18 }, // Net Claimable ITC (₹)
+  ];
+
+  ws.mergeCells("A1:M1");
+  const t = ws.getCell("A1");
+  t.value = "PURCHASE INVOICE REGISTER — INPUTS & INPUT SERVICES (RULE 42)";
+  t.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+  t.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
+  t.alignment = { horizontal: "center", vertical: "middle" };
+  ws.getRow(1).height = 26;
+
+  ws.mergeCells("A2:M2");
+  const sub = ws.getCell("A2");
+  sub.value = `Period: ${opts.filterTitle}`;
+  sub.font = { italic: true, color: { argb: HEADER_GREY }, size: 11 };
+  sub.alignment = { horizontal: "center" };
+  ws.getRow(2).height = 20;
+
+  const headers = [
+    "Date", "Invoice No", "Supplier Name", "GSTIN", "Description",
+    "Taxable Val (₹)", "IGST (₹)", "CGST (₹)", "SGST (₹)", "Total Tax (₹)",
+    "Classification", "Reversal (₹)", "Net Eligible (₹)",
+  ];
+  headers.forEach((h, i) => { const c = ws.getCell(4, i + 1); c.value = h; applyHeader(c); });
+  ws.getRow(4).height = 30;
+
+  opts.rows.forEach((row, i) => {
+    const rr = 5 + i;
+    ws.getCell(rr, 1).value = row.date || "—";
+    ws.getCell(rr, 2).value = row.invoiceNo || "—";
+    ws.getCell(rr, 3).value = row.supplier || "—";
+    ws.getCell(rr, 4).value = row.gstin || "—";
+    ws.getCell(rr, 5).value = row.description || "Input Service";
+    ws.getCell(rr, 6).value = row.taxableValue;
+    ws.getCell(rr, 7).value = row.igst;
+    ws.getCell(rr, 8).value = row.cgst;
+    ws.getCell(rr, 9).value = row.sgst;
+    ws.getCell(rr, 10).value = row.totalTax;
+    ws.getCell(rr, 11).value = row.classification;
+    ws.getCell(rr, 12).value = row.reversalAmt;
+    ws.getCell(rr, 13).value = row.netClaimAmt;
+
+    [6, 7, 8, 9, 10, 12, 13].forEach((col) => applyMoneyFormat(ws.getCell(rr, col)));
+    ws.getCell(rr, 10).font = { bold: true };
+    ws.getCell(rr, 12).font = { color: { argb: "FFB91C1C" }, bold: true };
+    ws.getCell(rr, 13).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
+    ws.getCell(rr, 13).font = { color: { argb: "FF15803D" }, bold: true };
+    applyZebra(ws.getRow(rr), i % 2 === 1);
+    rowBorders(ws, rr, 13);
+  });
+
+  // Footer Totals row
+  if (opts.rows.length > 0) {
+    const r = 5 + opts.rows.length;
+    ws.mergeCells(`A${r}:E${r}`);
+    const lbl = ws.getCell(r, 1);
+    lbl.value = `TOTAL (${opts.rows.length} Invoices)`;
+    lbl.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    lbl.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_GREY } };
+    lbl.alignment = { horizontal: "right", vertical: "middle" };
+
+    const totVal = (col: number, val: number, color?: string) => {
+      const c = ws.getCell(r, col); c.value = val; applyMoneyFormat(c);
+      c.font = { bold: true, color: { argb: color ?? HEADER_GREY } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
+    };
+
+    totVal(6, opts.rows.reduce((s, x) => s + x.taxableValue, 0));
+    totVal(7, opts.rows.reduce((s, x) => s + x.igst, 0));
+    totVal(8, opts.rows.reduce((s, x) => s + x.cgst, 0));
+    totVal(9, opts.rows.reduce((s, x) => s + x.sgst, 0));
+    totVal(10, opts.rows.reduce((s, x) => s + x.totalTax, 0));
+    
+    ws.getCell(r, 11).value = "—";
+    ws.getCell(r, 11).fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
+    ws.getCell(r, 11).alignment = { horizontal: "center" };
+
+    totVal(12, opts.rows.reduce((s, x) => s + x.reversalAmt, 0), "FFB91C1C");
+    totVal(13, opts.rows.reduce((s, x) => s + x.netClaimAmt, 0), "FF15803D");
+    rowBorders(ws, r, 13);
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+}
+

@@ -708,3 +708,98 @@ export function exportRule42ReconPdf(
 
   doc.save(filename);
 }
+
+// ---------- Detailed Purchase Invoice Register (Rule 42) PDF Export ----------
+export interface DetailedRule42PdfRow {
+  date: string;
+  invoiceNo: string;
+  supplier: string;
+  gstin: string;
+  description: string;
+  taxableValue: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  totalTax: number;
+  classification: string;
+  reversalAmt: number;
+  netClaimAmt: number;
+}
+
+export function exportDetailedRule42InvoicesPdf(
+  opts: { filterTitle: string; rows: DetailedRule42PdfRow[] },
+  filename: string,
+) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, pageWidth, 48, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text("PURCHASE INVOICE REGISTER — INPUTS & INPUT SERVICES (RULE 42)", pageWidth / 2, 22, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.text(`Period: ${opts.filterTitle}`, pageWidth / 2, 38, { align: "center" });
+
+  const bodyData = opts.rows.map((r) => [
+    r.date || "—",
+    r.invoiceNo || "—",
+    r.supplier || "—",
+    r.gstin || "—",
+    r.description || "Input Service",
+    fmt(r.taxableValue),
+    r.igst > 0 ? fmt(r.igst) : "—",
+    r.cgst > 0 ? fmt(r.cgst) : "—",
+    r.sgst > 0 ? fmt(r.sgst) : "—",
+    fmt(r.totalTax),
+    r.classification,
+    r.reversalAmt > 0 ? fmt(r.reversalAmt) : "—",
+    fmt(r.netClaimAmt),
+  ]);
+
+  const totTaxable = opts.rows.reduce((s, x) => s + x.taxableValue, 0);
+  const totIgst = opts.rows.reduce((s, x) => s + x.igst, 0);
+  const totCgst = opts.rows.reduce((s, x) => s + x.cgst, 0);
+  const totSgst = opts.rows.reduce((s, x) => s + x.sgst, 0);
+  const totTax = opts.rows.reduce((s, x) => s + x.totalTax, 0);
+  const totRev = opts.rows.reduce((s, x) => s + x.reversalAmt, 0);
+  const totNet = opts.rows.reduce((s, x) => s + x.netClaimAmt, 0);
+
+  const footData = [[
+    `TOTAL (${opts.rows.length})`, "", "", "", "",
+    fmt(totTaxable),
+    fmt(totIgst),
+    fmt(totCgst),
+    fmt(totSgst),
+    fmt(totTax),
+    "—",
+    fmt(totRev),
+    fmt(totNet),
+  ]];
+
+  autoTable(doc, {
+    startY: 56,
+    head: [[
+      "Date", "Invoice No", "Supplier Name", "GSTIN", "Description",
+      "Taxable Val", "IGST", "CGST", "SGST", "Total Tax",
+      "Classification", "Reversal", "Net Eligible",
+    ]],
+    body: bodyData,
+    foot: footData,
+    theme: "striped",
+    showFoot: "lastPage",
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 8, halign: "center" },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 8, halign: "right" },
+    bodyStyles: { fontSize: 7, halign: "right" },
+    columnStyles: {
+      0: { halign: "left" }, 1: { halign: "left" }, 2: { halign: "left" }, 3: { halign: "left" }, 4: { halign: "left" },
+      9: { fontStyle: "bold" },
+      10: { halign: "center" },
+      11: { textColor: [185, 28, 28], fontStyle: "bold" },
+      12: { textColor: [21, 128, 61], fontStyle: "bold" },
+    },
+    margin: { left: 18, right: 18 },
+  });
+
+  doc.save(filename);
+}

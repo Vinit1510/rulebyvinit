@@ -21,12 +21,12 @@ import {
 } from "@/lib/rule43";
 import {
   exportRule43Xlsx, exportInvoiceXlsx, exportRegisterXlsx, exportBlockedCreditXlsx,
-  exportRule42Xlsx, exportRule42ReconXlsx,
+  exportRule42Xlsx, exportRule42ReconXlsx, exportDetailedRule42InvoicesXlsx,
   periodLabel, type DetailedRow, type BlockedRow,
 } from "@/lib/excel";
 import {
   exportRule43Pdf, exportInvoicePdf, exportRegisterPdf, exportBlockedCreditPdf,
-  exportRule42Pdf, exportRule42ReconPdf
+  exportRule42Pdf, exportRule42ReconPdf, exportDetailedRule42InvoicesPdf,
 } from "@/lib/pdf";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -311,39 +311,41 @@ function Rule42MonthlyReport({
   }, [detailedInvoiceRows]);
 
   const handleDetailedExcel = async () => {
-    const regRows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, netClaimAmt }) => ({
-      invoiceNo: inv.invoiceNo || "—",
+    const rows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, reversalAmt, netClaimAmt }) => ({
       date: inv.purchaseDate || "—",
-      asset: inv.assetName || "Input Service",
+      invoiceNo: inv.invoiceNo || "—",
       supplier: inv.supplier || "—",
       gstin: inv.gstin || "—",
+      description: inv.assetName || "Input Service",
       taxableValue: inv.taxableValue || 0,
-      netItc: totTax,
-      igstRev: igstVal,
-      cgstRev: cgstVal,
-      sgstRev: sgstVal,
-      retained: netClaimAmt,
-      status: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      igst: igstVal,
+      cgst: cgstVal,
+      sgst: sgstVal,
+      totalTax: totTax,
+      classification: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      reversalAmt: reversalAmt,
+      netClaimAmt: netClaimAmt,
     }));
-    await exportRegisterXlsx({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`);
+    await exportDetailedRule42InvoicesXlsx({ filterTitle: filterTitle(filter), rows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.xlsx`);
   };
 
   const handleDetailedPdf = () => {
-    const regRows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, netClaimAmt }) => ({
-      invoiceNo: inv.invoiceNo || "—",
+    const rows = detailedInvoiceRows.map(({ inv, igstVal, cgstVal, sgstVal, totTax, reversalAmt, netClaimAmt }) => ({
       date: inv.purchaseDate || "—",
-      asset: inv.assetName || "Input Service",
+      invoiceNo: inv.invoiceNo || "—",
       supplier: inv.supplier || "—",
       gstin: inv.gstin || "—",
+      description: inv.assetName || "Input Service",
       taxableValue: inv.taxableValue || 0,
-      netItc: totTax,
-      igstRev: igstVal,
-      cgstRev: cgstVal,
-      sgstRev: sgstVal,
-      retained: netClaimAmt,
-      status: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      igst: igstVal,
+      cgst: cgstVal,
+      sgst: sgstVal,
+      totalTax: totTax,
+      classification: inv.usage === "taxable" ? "Taxable Only (T4)" : inv.usage === "exempt" ? "Exempt Only (T2)" : inv.nonBusinessUse === "100_personal" ? "100% Personal (T1)" : inv.nonBusinessUse === "partial_personal" ? "Partial Personal (D2)" : "Common Use (C2)",
+      reversalAmt: reversalAmt,
+      netClaimAmt: netClaimAmt,
     }));
-    exportRegisterPdf({ rows: regRows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`);
+    exportDetailedRule42InvoicesPdf({ filterTitle: filterTitle(filter), rows }, `Detailed-Invoices-${filterFilenameSuffix(filter)}.pdf`);
   };
 
   return (
