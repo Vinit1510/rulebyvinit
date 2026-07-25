@@ -24,11 +24,13 @@ export async function getOrCreateBackupFolder(accessToken: string): Promise<stri
     if (searchRes.ok) {
       const result = await searchRes.json();
       if (result.files && result.files.length > 0) {
+        console.log("[Google Drive Sync] Found existing backup folder:", result.files[0].name, result.files[0].id);
         return result.files[0].id;
       }
     }
 
     // 2. Folder doesn't exist — create a new dedicated folder
+    console.log("[Google Drive Sync] Creating new dedicated folder:", FOLDER_NAME);
     const createRes = await fetch(GOOGLE_DRIVE_API_URL, {
       method: "POST",
       headers: {
@@ -43,6 +45,7 @@ export async function getOrCreateBackupFolder(accessToken: string): Promise<stri
 
     if (createRes.ok) {
       const createdFolder = await createRes.json();
+      console.log("[Google Drive Sync] Dedicated folder created successfully:", createdFolder.name, createdFolder.id);
       return createdFolder.id;
     }
   } catch (error) {
@@ -168,6 +171,7 @@ export async function uploadTaxDataFile(
     }
 
     const result = await response.json();
+    console.log("[Google Drive Sync] Backup file uploaded successfully:", FILE_NAME, "ID:", result.id);
     return result.id;
   } catch (error) {
     console.error("uploadTaxDataFile failed:", error);
