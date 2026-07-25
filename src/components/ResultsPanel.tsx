@@ -880,59 +880,59 @@ function Rule42AnnualReconciliationReport({
               <TableBody>
                 <TableRow className="hover:bg-muted/40 text-xs">
                   <TableCell className="font-medium">Annual Common Credit (C2)</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.annualC2.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.annualC2?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.annualC2?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.annualC2?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-semibold">{formatINRPrecise(sumC2)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 text-xs">
                   <TableCell className="font-medium">Annual Exempt Supplies Turnover (E)</TableCell>
                   <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Exempt Turnover</TableCell>
-                  <TableCell className="text-right num font-semibold">{formatINR(recon.annualExemptTurnover)}</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINR(recon?.annualExemptTurnover ?? 0)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 text-xs">
                   <TableCell className="font-medium">Annual Total supplies Turnover (F)</TableCell>
                   <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Total Turnover</TableCell>
-                  <TableCell className="text-right num font-semibold">{formatINR(recon.annualTotalTurnover)}</TableCell>
+                  <TableCell className="text-right num font-semibold">{formatINR(recon?.annualTotalTurnover ?? 0)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 text-xs">
                   <TableCell className="font-medium text-primary">Annual Exempt turnover Ratio (E/F)</TableCell>
                   <TableCell colSpan={3} className="text-right font-medium italic text-[11px] text-muted-foreground">FY Ratio</TableCell>
-                  <TableCell className="text-right num font-semibold text-primary">{(recon.annualExemptRatio * 100).toFixed(2)}%</TableCell>
+                  <TableCell className="text-right num font-semibold text-primary">{((recon?.annualExemptRatio ?? 0) * 100).toFixed(2)}%</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 text-destructive bg-destructive/5 text-xs">
                   <TableCell className="font-medium text-destructive">Annual Required Exempt Reversal (D1)</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD1.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD1?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD1?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD1?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-bold">{formatINRPrecise(sumReqD1)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 text-destructive bg-destructive/5 text-xs">
                   <TableCell className="font-medium text-destructive">Annual Required Personal Reversal (D2 - 5%)</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredD2.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD2?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD2?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredD2?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-bold">{formatINRPrecise(sumReqD2)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 bg-muted/20 font-semibold border-y text-xs">
                   <TableCell>Annual Required Total Reversal (D1+D2)</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.requiredTotalReversal.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredTotalReversal?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredTotalReversal?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.requiredTotalReversal?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-bold text-base">{formatINRPrecise(sumReqReversal)}</TableCell>
                 </TableRow>
                 <TableRow className="hover:bg-muted/40 bg-muted/10 text-muted-foreground text-xs">
                   <TableCell>Actual Monthly Reversals Sum</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.sumMonthlyReversed.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.sumMonthlyReversed?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.sumMonthlyReversed?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.sumMonthlyReversed?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-semibold">{formatINRPrecise(sumActualReversed)}</TableCell>
                 </TableRow>
                 <TableRow className={`hover:bg-muted/40 font-black border-t-2 text-xs ${isShortfall ? "text-destructive bg-destructive/5" : "text-green-700 dark:text-green-400 bg-green-500/5"}`}>
                   <TableCell>Final Reversal Variance (Shortfall / Excess)</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.igst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.cgst)}</TableCell>
-                  <TableCell className="text-right num">{formatINRPrecise(recon.variance.sgst)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.variance?.igst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.variance?.cgst ?? 0)}</TableCell>
+                  <TableCell className="text-right num">{formatINRPrecise(recon?.variance?.sgst ?? 0)}</TableCell>
                   <TableCell className="text-right num font-black text-base">{formatINRPrecise(sumVariance)}</TableCell>
                 </TableRow>
               </TableBody>
