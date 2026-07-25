@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator, Loader2, Key, Settings, Info } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calculator, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getAdminSettings, verifyActivationCode, updateCodeStatus } from "@/lib/firebase";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,35 +27,58 @@ export function AuthPage() {
   const { signIn, loading, clientId, updateClientId, isSignedIn } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [showConfig, setShowConfig] = useState(false);
-  const [tempClientId, setTempClientId] = useState(clientId);
+
+  // Activation code state
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [inputCode, setInputCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (isSignedIn) {
-      toast({
-        title: "Signed in successfully!",
-        description: "Google Drive Sync is active. Loading your dashboard...",
-      });
-      setLocation("/dashboard");
+      (async () => {
+        const settings = await getAdminSettings();
+        const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+
+        if (!settings.activationRequired || storedCode) {
+          toast({
+            title: "Signed in successfully!",
+            description: "Google Drive Sync is active. Loading your dashboard...",
+          });
+          setLocation("/dashboard");
+        } else {
+          // Activation required and user hasn't activated yet
+          setShowActivationModal(true);
+        }
+      })();
     }
   }, [isSignedIn, setLocation, toast]);
 
-  const saveClientId = (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tempClientId.trim()) {
+    if (!inputCode.trim()) return;
+
+    setVerifying(true);
+    const res = await verifyActivationCode(inputCode);
+    setVerifying(false);
+
+    if (res.valid && res.doc) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("r43_activated_code", res.doc.code);
+      }
+      await updateCodeStatus(res.doc.id, "redeemed");
       toast({
-        title: "Client ID required",
-        description: "Please enter a valid Google OAuth Client ID.",
+        title: "Activation Successful!",
+        description: `Code ${res.doc.code} verified. Redirecting to dashboard...`,
+      });
+      setShowActivationModal(false);
+      setLocation("/dashboard");
+    } else {
+      toast({
+        title: "Activation Failed",
+        description: res.message || "Invalid activation code.",
         variant: "destructive",
       });
-      return;
     }
-    updateClientId(tempClientId.trim());
-    toast({
-      title: "Client ID Saved",
-      description: "You can now connect to Google Drive using your custom credentials.",
-    });
-    setShowConfig(false);
   };
 
   return (
@@ -90,10 +115,9 @@ export function AuthPage() {
                 if (clientId) {
                   signIn();
                 } else {
-                  setShowConfig(true);
                   toast({
                     title: "Google Client ID Required",
-                    description: "Please enter your Google Client ID in the setup box below to connect Google Drive.",
+                    description: "Please configure your Google Client ID at /vinit to enable cloud sync.",
                   });
                 }
               }}
@@ -168,9 +192,41 @@ export function AuthPage() {
         </Card>
 
         <p className="text-center text-[11px] text-muted-foreground leading-normal max-w-xs mx-auto">
-          CAs & Tax consultants retain 100% ownership. Files are saved as encrypted JSON configurations on your private Google Drive.
+          CAs &amp; Tax consultants retain 100% ownership. Files are saved as encrypted JSON configurations on your private Google Drive.
         </p>
       </div>
+
+      {/* Activation Code Required Dialog Modal */}
+      <Dialog open={showActivationModal} onOpenChange={setShowActivationModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <KeyRound className="h-5 w-5 text-primary" /> Enter Activation Code
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Activation Code enforcement is enabled by the Administrator. Please enter your assigned activation code to unlock access.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleVerifyCode} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Activation Code</Label>
+              <Input
+                placeholder="e.g. R43-6CD7"
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                className="text-sm font-mono tracking-wider uppercase h-10"
+                required
+                autoFocus
+              />
+            </div>
+
+            <Button type="submit" disabled={verifying} className="w-full h-10 font-semibold text-xs">
+              {verifying ? "Verifying Code..." : "Activate & Continue to Dashboard"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
