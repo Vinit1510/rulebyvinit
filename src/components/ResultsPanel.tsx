@@ -278,60 +278,63 @@ function Rule42MonthlyReport({
             </div>
           </CardContent>
         </Card>
-      {/* GSTR-3B Table 4 Filing Summary Card */}
+      {/* Head-wise ITC & Reversal Summary Card */}
       <Card className="border-teal-500/30 bg-teal-500/5 dark:bg-teal-950/20 shadow-sm">
         <CardHeader className="py-3 px-5 border-b border-teal-500/20 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge className="bg-teal-600 text-white hover:bg-teal-700 text-[10px] font-bold uppercase tracking-wider">
-              GSTR-3B Portal Ready
-            </Badge>
-            <h4 className="text-sm font-bold text-foreground">FORM GSTR-3B Table 4 Head-wise Bifurcation ({filterTitle(filter)})</h4>
+            <h4 className="text-sm font-bold text-foreground">Head-wise Tax Reversal &amp; ITC Summary ({filterTitle(filter)})</h4>
           </div>
-          <span className="text-[11px] text-muted-foreground italic font-medium">Head-wise IGST / CGST / SGST breakdown for GSTR-3B filing</span>
+          <span className="text-[11px] text-muted-foreground italic font-medium">Head-wise IGST / CGST / SGST Amount Breakdown</span>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow className="text-xs">
-                <TableHead className="font-bold text-foreground">GSTR-3B Table 4 Section</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">Integrated Tax (IGST ₹)</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">Central Tax (CGST ₹)</TableHead>
-                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">State/UT Tax (SGST ₹)</TableHead>
+                <TableHead className="font-bold text-foreground">Calculation Component</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">IGST (₹)</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">CGST (₹)</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">SGST (₹)</TableHead>
                 <TableHead className="text-right font-bold text-foreground">Total Amount (₹)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="text-xs font-medium">
               <TableRow className="hover:bg-muted/30">
-                <TableCell className="font-medium">
-                  <span className="font-bold text-foreground">4(A)(5)</span> All other ITC Credited (Gross C1)
-                </TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.igst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.cgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(totC1.igst + totC1.cgst + totC1.sgst)}</TableCell>
+                <TableCell className="font-medium">Total Inward ITC (T)</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.igst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.cgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(sumT)}</TableCell>
               </TableRow>
-              <TableRow className="hover:bg-destructive/10 bg-destructive/5 text-destructive">
-                <TableCell className="font-medium">
-                  <span className="font-bold">4(B)(1)</span> Reversals u/r 42 &amp; 43 (<strong className="font-bold">D1 + D2</strong>)
-                </TableCell>
+              <TableRow className="hover:bg-muted/30">
+                <TableCell className="font-medium">Common Credit (C2)</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.igst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.cgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC2.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(totC2.igst + totC2.cgst + totC2.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                <TableCell className="font-medium">Exempt Reversal (D1)</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD1.cgst + totD1.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-rose-500/10 text-rose-700 dark:text-rose-400">
+                <TableCell className="font-medium">⭐ Non-Business Reversal (D2 - 5%)</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.cgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD2.igst + totD2.cgst + totD2.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-destructive/10 bg-destructive/5 text-destructive font-bold">
+                <TableCell className="font-medium">Total ITC Reversal (D1 + D2)</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD2.igst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst + totD2.cgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst + totD2.sgst)}</TableCell>
                 <TableCell className="text-right num font-black text-sm">{formatINRPrecise(sumReversal)}</TableCell>
               </TableRow>
-              <TableRow className="hover:bg-muted/30 text-amber-700 dark:text-amber-400">
-                <TableCell className="font-medium">
-                  <span className="font-bold">4(B)(2)</span> Other Reversals (T1 Non-Bus + T3 Blocked)
-                </TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.igst + totT3.igst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.cgst + totT3.cgst)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.sgst + totT3.sgst)}</TableCell>
-                <TableCell className="text-right num font-bold">{formatINRPrecise(totT1.igst + totT3.igst + totT1.cgst + totT3.cgst + totT1.sgst + totT3.sgst)}</TableCell>
-              </TableRow>
               <TableRow className="hover:bg-green-500/20 bg-green-500/10 font-bold text-green-700 dark:text-green-300 text-sm">
-                <TableCell>
-                  <span>4(C)</span> Net ITC Available (T4 + C3)
-                </TableCell>
+                <TableCell>Net Eligible Claimed ITC</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.igst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.cgst)}</TableCell>
                 <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.sgst)}</TableCell>
