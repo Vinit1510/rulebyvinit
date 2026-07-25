@@ -372,11 +372,14 @@ function ProtectedRoute() {
   return <MainApp />;
 }
 
+import { AdminPage } from "@/pages/AdminPage";
+
 function App() {
   return (
     <WouterRouter base={basePath}>
       <TooltipProvider delayDuration={150}>
         <RouteSwitch>
+          <Route path="/vinit" component={AdminPage} />
           <Route path="/sign-in" component={AuthPage} />
           <Route path="/dashboard" component={ProtectedRoute} />
           <Route path="/invoices" component={ProtectedRoute} />
