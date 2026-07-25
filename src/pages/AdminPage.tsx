@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import {
-  ShieldCheck, Key, ArrowLeft, CheckCircle2, AlertTriangle, Save,
-  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search
+  ShieldCheck, Key, ArrowLeft, Save,
+  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -22,7 +22,18 @@ export function AdminPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // State
+  // Admin Password Authentication State
+  const DEFAULT_ADMIN_PASS = "vinit@2026";
+  const [adminPass, setAdminPass] = useState<string>(() => {
+    return (typeof window !== "undefined" && localStorage.getItem("r43_admin_master_pass")) || DEFAULT_ADMIN_PASS;
+  });
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return typeof window !== "undefined" && sessionStorage.getItem("r43_admin_authenticated") === "true";
+  });
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [newPassInput, setNewPassInput] = useState("");
+
+  // Data State
   const [tempClientId, setTempClientId] = useState(clientId);
   const [loading, setLoading] = useState(true);
   const [savingToggle, setSavingToggle] = useState(false);
@@ -58,8 +69,53 @@ export function AdminPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAdminAuthenticated) {
+      loadData();
+    }
+  }, [isAdminAuthenticated]);
+
+  // Handle Admin Login
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPasswordInput.trim() === adminPass) {
+      setIsAdminAuthenticated(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("r43_admin_authenticated", "true");
+      }
+      toast({
+        title: "Admin Access Granted",
+        description: "Welcome to Master Admin Control Panel.",
+      });
+    } else {
+      toast({
+        title: "Access Denied",
+        description: "Invalid Admin Password.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("r43_admin_authenticated");
+    }
+  };
+
+  // Change Admin Password
+  const handleUpdateAdminPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassInput.trim()) return;
+    setAdminPass(newPassInput.trim());
+    if (typeof window !== "undefined") {
+      localStorage.setItem("r43_admin_master_pass", newPassInput.trim());
+    }
+    setNewPassInput("");
+    toast({
+      title: "Admin Password Updated!",
+      description: "Your master password for /vinit has been updated.",
+    });
+  };
 
   // Handle Activation Toggle
   const handleToggleActivation = async (checked: boolean) => {
@@ -106,7 +162,7 @@ export function AdminPage() {
       setCustomCodeInput("");
       toast({
         title: "Activation Code Created!",
-        description: `Code ${created.code} for "${created.clientName}" is live.`,
+        description: `Code ${created.code} for "${created.clientName}" is live. Locked to 1 Gmail address upon redemption.`,
       });
     } else {
       toast({
@@ -164,6 +220,46 @@ export function AdminPage() {
       u.name.toLowerCase().includes(userSearch.toLowerCase())
   );
 
+  // If not authenticated as Admin: Show Admin Password Lock Screen
+  if (!isAdminAuthenticated) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10 relative overflow-hidden">
+        <div className="w-full max-w-sm relative z-10 space-y-6">
+          <Card className="border border-border/80 shadow-lg">
+            <CardHeader className="text-center pb-4">
+              <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2 border border-primary/20">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <CardTitle className="text-lg font-bold">Admin Security Access</CardTitle>
+              <CardDescription className="text-xs">
+                Enter Master Password to access gstreversal.vercel.app/vinit
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Master Admin Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="Default: vinit@2026"
+                    value={adminPasswordInput}
+                    onChange={(e) => setAdminPasswordInput(e.target.value)}
+                    className="text-xs h-10"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <Button type="submit" className="w-full h-10 text-xs font-semibold">
+                  Unlock Admin Dashboard
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background px-4 py-8 max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -182,23 +278,33 @@ export function AdminPage() {
               <ShieldCheck className="h-5 w-5 text-primary" /> Master Administration Panel
             </h1>
             <p className="text-xs text-muted-foreground">
-              Secret URL: gstreversal.vercel.app/vinit — Hidden from clients
+              Secret URL: gstreversal.vercel.app/vinit (Protected)
             </p>
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadData}
-          disabled={loading}
-          className="gap-1.5 text-xs font-semibold"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh Data
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={loading}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleAdminLogout}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Exit Admin
+          </Button>
+        </div>
       </div>
 
-      {/* Grid Section 1: Activation Toggle & System Status */}
+      {/* Grid Section 1: Activation Toggle & Admin Password */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Master ON/OFF Activation Toggle Card */}
         <Card className="border border-border/80 shadow-sm">
@@ -251,16 +357,49 @@ export function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Google OAuth Client ID Card */}
+        {/* Change Admin Master Password Card */}
         <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Lock className="h-4 w-4 text-primary" /> Admin Master Password
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Change the password required to access gstreversal.vercel.app/vinit.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdateAdminPassword} className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-[11px] font-semibold">New Master Password</Label>
+                <Input
+                  type="password"
+                  placeholder="Enter new admin password"
+                  value={newPassInput}
+                  onChange={(e) => setNewPassInput(e.target.value)}
+                  className="text-xs h-9"
+                  required
+                />
+              </div>
+              <Button type="submit" size="sm" className="w-full h-8 text-xs font-semibold gap-1.5">
+                <Save className="h-3.5 w-3.5" /> Update Admin Password
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grid Section 2: Google OAuth Client ID & Code Generator */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Google OAuth Client ID Card */}
+        <Card className="border border-border/80 shadow-sm md:col-span-1">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Key className="h-4 w-4 text-primary" /> Google OAuth Credentials
+                <Key className="h-4 w-4 text-primary" /> Google Client ID
               </CardTitle>
               {clientId ? (
                 <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Configured
+                  Active
                 </span>
               ) : (
                 <span className="text-[10px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
@@ -269,7 +408,7 @@ export function AdminPage() {
               )}
             </div>
             <CardDescription className="text-xs">
-              Master Client ID used for Google Sign-In and Google Drive Cloud Sync.
+              Google OAuth Client ID for cloud sync.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -289,118 +428,118 @@ export function AdminPage() {
             </form>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Grid Section 2: Activation Code Generator */}
-      <Card className="border border-border/80 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <KeyRound className="h-4 w-4 text-primary" /> Generate Activation Codes
-            </CardTitle>
-            <span className="text-xs text-muted-foreground font-semibold">
-              Total Codes: {codes.length}
-            </span>
-          </div>
-          <CardDescription className="text-xs">
-            Create single-use or client-assigned activation codes to give specific clients access.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
-            <div>
-              <Label className="text-[11px] font-semibold">Client Name / Label</Label>
-              <Input
-                placeholder="e.g. Acme CA Firm"
-                value={newClientName}
-                onChange={(e) => setNewClientName(e.target.value)}
-                className="text-xs h-8 bg-background mt-1"
-                required
-              />
+        {/* Activation Code Generator */}
+        <Card className="border border-border/80 shadow-sm md:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-primary" /> Generate Activation Codes (1 Code = 1 Gmail)
+              </CardTitle>
+              <span className="text-xs text-muted-foreground font-semibold">
+                Total Codes: {codes.length}
+              </span>
             </div>
-            <div>
-              <Label className="text-[11px] font-semibold">Custom Code (Optional)</Label>
-              <Input
-                placeholder="Leave blank for auto-generate"
-                value={customCodeInput}
-                onChange={(e) => setCustomCodeInput(e.target.value)}
-                className="text-xs h-8 bg-background mt-1 uppercase font-mono"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" size="sm" disabled={creatingCode} className="w-full h-8 text-xs font-semibold gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> {creatingCode ? "Generating..." : "Generate Code"}
-              </Button>
-            </div>
-          </form>
+            <CardDescription className="text-xs">
+              Codes automatically lock to the first Gmail address that redeems them.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
+              <div>
+                <Label className="text-[11px] font-semibold">Client Name / Label</Label>
+                <Input
+                  placeholder="e.g. Acme CA Firm"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  className="text-xs h-8 bg-background mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-[11px] font-semibold">Custom Code (Optional)</Label>
+                <Input
+                  placeholder="Leave blank to auto-generate"
+                  value={customCodeInput}
+                  onChange={(e) => setCustomCodeInput(e.target.value)}
+                  className="text-xs h-8 bg-background mt-1 uppercase font-mono"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" size="sm" disabled={creatingCode} className="w-full h-8 text-xs font-semibold gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> {creatingCode ? "Generating..." : "Generate Code"}
+                </Button>
+              </div>
+            </form>
 
-          {/* List of Created Activation Codes */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="max-h-56 overflow-y-auto divide-y">
-              {codes.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                  No activation codes created yet. Fill the form above to generate your first code.
-                </div>
-              ) : (
-                codes.map((c) => (
-                  <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
-                    <div className="flex items-center gap-3">
-                      <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
-                        {c.code}
-                      </code>
-                      <div>
-                        <p className="font-semibold text-foreground leading-tight">{c.clientName}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Created: {new Date(c.createdAt).toLocaleDateString()}
-                          {c.usedByEmail && ` • Used by: ${c.usedByEmail}`}
-                        </p>
+            {/* List of Created Activation Codes */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-56 overflow-y-auto divide-y">
+                {codes.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">
+                    No activation codes created yet. Fill the form above to generate your first code.
+                  </div>
+                ) : (
+                  codes.map((c) => (
+                    <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
+                      <div className="flex items-center gap-3">
+                        <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
+                          {c.code}
+                        </code>
+                        <div>
+                          <p className="font-semibold text-foreground leading-tight">{c.clientName}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Created: {new Date(c.createdAt).toLocaleDateString()}
+                            {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                            c.status === "active"
+                              ? "bg-emerald-500/15 text-emerald-600"
+                              : c.status === "redeemed"
+                              ? "bg-blue-500/15 text-blue-600"
+                              : "bg-red-500/15 text-red-600"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleCopy(c.code, c.id)}
+                          title="Copy Code"
+                        >
+                          {copiedId === c.id ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                          onClick={() => handleToggleCodeStatus(c.id, c.status)}
+                          title={c.status === "revoked" ? "Re-activate Code" : "Revoke Code"}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                          c.status === "active"
-                            ? "bg-emerald-500/15 text-emerald-600"
-                            : c.status === "redeemed"
-                            ? "bg-blue-500/15 text-blue-600"
-                            : "bg-red-500/15 text-red-600"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleCopy(c.code, c.id)}
-                        title="Copy Code"
-                      >
-                        {copiedId === c.id ? (
-                          <Check className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleToggleCodeStatus(c.id, c.status)}
-                        title={c.status === "revoked" ? "Re-activate Code" : "Revoke Code"}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Grid Section 3: Live Registered Users Table */}
       <Card className="border border-border/80 shadow-sm">

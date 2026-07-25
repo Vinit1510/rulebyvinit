@@ -157,11 +157,15 @@ export async function updateCodeStatus(codeId: string, status: "active" | "revok
   }
 }
 
-/** Verify if an activation code is valid and active */
-export async function verifyActivationCode(inputCode: string): Promise<{ valid: boolean; doc?: ActivationCode; message?: string }> {
+/** Verify if an activation code is valid, active, and lock it to 1 Gmail address */
+export async function verifyActivationCode(
+  inputCode: string,
+  userEmail?: string
+): Promise<{ valid: boolean; doc?: ActivationCode; message?: string }> {
   try {
     const codes = await getActivationCodes();
     const cleanInput = inputCode.trim().toUpperCase();
+    const cleanEmail = (userEmail || "").trim().toLowerCase();
     const match = codes.find(c => c.code === cleanInput);
 
     if (!match) {
@@ -169,6 +173,14 @@ export async function verifyActivationCode(inputCode: string): Promise<{ valid: 
     }
     if (match.status === "revoked") {
       return { valid: false, message: "This activation code has been revoked by admin." };
+    }
+    if (match.status === "redeemed" && match.usedByEmail) {
+      if (cleanEmail && match.usedByEmail.toLowerCase() !== cleanEmail) {
+        return {
+          valid: false,
+          message: `This activation code is locked to ${match.usedByEmail} and cannot be used by another Gmail account.`,
+        };
+      }
     }
     return { valid: true, doc: match };
   } catch (e) {

@@ -24,7 +24,7 @@ function GoogleIcon() {
 }
 
 export function AuthPage() {
-  const { signIn, loading, clientId, updateClientId, isSignedIn } = useAuth();
+  const { signIn, loading, clientId, updateClientId, isSignedIn, user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -58,17 +58,17 @@ export function AuthPage() {
     if (!inputCode.trim()) return;
 
     setVerifying(true);
-    const res = await verifyActivationCode(inputCode);
+    const res = await verifyActivationCode(inputCode, user?.email);
     setVerifying(false);
 
     if (res.valid && res.doc) {
       if (typeof window !== "undefined") {
         localStorage.setItem("r43_activated_code", res.doc.code);
       }
-      await updateCodeStatus(res.doc.id, "redeemed");
+      await updateCodeStatus(res.doc.id, "redeemed", user?.email);
       toast({
         title: "Activation Successful!",
-        description: `Code ${res.doc.code} verified. Redirecting to dashboard...`,
+        description: `Code ${res.doc.code} verified for ${user?.email || "your account"}. Redirecting to dashboard...`,
       });
       setShowActivationModal(false);
       setLocation("/dashboard");
