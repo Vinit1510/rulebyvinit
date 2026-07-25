@@ -76,17 +76,22 @@ export function AuthPage() {
           <CardContent className="space-y-4">
             <Button
               type="button"
-              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200 opacity-80"
+              className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200"
               onClick={() => {
-                toast({
-                  title: "Google Drive Sync — Coming Soon!",
-                  description: "Google Cloud Sync is currently under development. Please click 'Continue Offline (Local Sandbox)' below to use the application.",
-                });
+                if (clientId) {
+                  signIn();
+                } else {
+                  setShowConfig(true);
+                  toast({
+                    title: "Google Client ID Required",
+                    description: "Please enter your Google Client ID in the setup box below to connect Google Drive.",
+                  });
+                }
               }}
             >
               <div className="flex items-center gap-2">
                 <GoogleIcon />
-                <span>Continue with Google (Coming Soon)</span>
+                <span>{clientId ? "Continue with Google" : "Connect Google Drive (Setup Required)"}</span>
               </div>
             </Button>
 
