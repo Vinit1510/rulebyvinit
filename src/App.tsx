@@ -23,6 +23,7 @@ import { useCalculator } from "@/hooks/useCalculator";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { unionMonths } from "@/lib/rule43";
+import { getAdminSettings, verifyActivationCode } from "@/lib/firebase";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -357,18 +358,70 @@ function FullScreenLoader() {
 }
 
 function ProtectedRoute() {
-  const { isSignedIn, loading } = useAuth();
+  const { isSignedIn, loading, user } = useAuth();
   const [, setLocation] = useLocation();
   const isOfflineMode = typeof window !== "undefined" && localStorage.getItem("r43_working_offline") === "true";
 
-  useEffect(() => {
-    if (!loading && !isSignedIn && !isOfflineMode) {
-      setLocation("/sign-in");
-    }
-  }, [loading, isSignedIn, isOfflineMode, setLocation]);
+  const [checkingActivation, setCheckingActivation] = useState(true);
+  const [isActivated, setIsActivated] = useState(true);
 
-  if (loading) return <FullScreenLoader />;
+  useEffect(() => {
+    let active = true;
+
+    if (!loading) {
+      if (!isSignedIn && !isOfflineMode) {
+        setLocation("/sign-in");
+        return;
+      }
+
+      if (isSignedIn && !isOfflineMode) {
+        (async () => {
+          const settings = await getAdminSettings();
+          const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+
+          if (settings.activationRequired) {
+            if (!storedCode) {
+              if (active) {
+                setIsActivated(false);
+                setCheckingActivation(false);
+                setLocation("/sign-in");
+              }
+              return;
+            }
+
+            const check = await verifyActivationCode(storedCode, user?.email);
+            if (!check.valid) {
+              if (active) {
+                setIsActivated(false);
+                setCheckingActivation(false);
+                setLocation("/sign-in");
+              }
+              return;
+            }
+          }
+
+          if (active) {
+            setIsActivated(true);
+            setCheckingActivation(false);
+          }
+        })();
+      } else {
+        if (active) {
+          setIsActivated(true);
+          setCheckingActivation(false);
+        }
+      }
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [loading, isSignedIn, isOfflineMode, user, setLocation]);
+
+  if (loading || checkingActivation) return <FullScreenLoader />;
   if (!isSignedIn && !isOfflineMode) return <FullScreenLoader />;
+  if (isSignedIn && !isOfflineMode && !isActivated) return <FullScreenLoader />;
+
   return <MainApp />;
 }
 

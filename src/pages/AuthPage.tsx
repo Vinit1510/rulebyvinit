@@ -204,9 +204,13 @@ export function AuthPage() {
         </p>
       </div>
 
-      {/* Activation Code Required Dialog Modal */}
-      <Dialog open={showActivationModal} onOpenChange={setShowActivationModal}>
-        <DialogContent className="sm:max-w-md">
+      {/* Non-dismissible Activation Code Required Dialog Modal */}
+      <Dialog open={showActivationModal} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-md [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <KeyRound className="h-5 w-5 text-primary" /> Enter Activation Code
@@ -229,9 +233,28 @@ export function AuthPage() {
               />
             </div>
 
-            <Button type="submit" disabled={verifying} className="w-full h-10 font-semibold text-xs">
-              {verifying ? "Verifying Code..." : "Activate & Continue to Dashboard"}
-            </Button>
+            <div className="space-y-2">
+              <Button type="submit" disabled={verifying} className="w-full h-10 font-semibold text-xs">
+                {verifying ? "Verifying Code..." : "Activate & Continue to Dashboard"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-xs text-muted-foreground hover:text-destructive h-8"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem("r43_google_token");
+                    localStorage.removeItem("r43_google_user");
+                    localStorage.removeItem("r43_activated_code");
+                  }
+                  setShowActivationModal(false);
+                  window.location.reload();
+                }}
+              >
+                Sign Out / Switch Google Account
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
