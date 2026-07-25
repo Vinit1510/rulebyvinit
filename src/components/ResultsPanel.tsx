@@ -220,6 +220,18 @@ function Rule42MonthlyReport({
     }, filename);
   };
 
+  const [subReportMode, setSubReportMode] = useState<"summary" | "detailed">("summary");
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((inv) => {
+      if ((inv.itemType ?? "capital_good") === "capital_good") return false;
+      if (!inv.purchaseDate) return false;
+      const d = new Date(inv.purchaseDate);
+      if (isNaN(d.getTime())) return false;
+      return inFilter(d, filter);
+    });
+  }, [invoices, filter]);
+
   const detailedInvoiceRows = useMemo(() => {
     const monthResultMap = new Map<string, Rule42MonthResult>();
     for (const r of rows) {
@@ -289,18 +301,18 @@ function Rule42MonthlyReport({
       <div className="flex items-center justify-between gap-4 flex-wrap bg-card p-3 rounded-lg border shadow-sm no-print">
         <div className="flex items-center gap-2">
           <Button
-            variant={reportType === "summary" ? "default" : "outline"}
+            variant={subReportMode === "summary" ? "default" : "outline"}
             size="sm"
-            onClick={() => setReportType("summary")}
+            onClick={() => setSubReportMode("summary")}
             className="text-xs h-8 font-semibold"
           >
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Summary Report
           </Button>
           <Button
-            variant={reportType === "detailed" ? "default" : "outline"}
+            variant={subReportMode === "detailed" ? "default" : "outline"}
             size="sm"
-            onClick={() => setReportType("detailed")}
+            onClick={() => setSubReportMode("detailed")}
             className="text-xs h-8 font-semibold"
           >
             <FileText className="h-3.5 w-3.5 mr-1.5" />
@@ -312,7 +324,7 @@ function Rule42MonthlyReport({
         </div>
       </div>
 
-      {reportType === "summary" ? (
+      {subReportMode === "summary" ? (
         <>
           {/* Summary totals block */}
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
