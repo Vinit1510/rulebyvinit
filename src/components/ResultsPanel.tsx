@@ -1209,31 +1209,14 @@ export function ResultsPanel({ invoices, turnover }: Props) {
           </TabsContent>
         </Tabs>
       ) : reportType === "rule42" ? (
-        <Tabs value={r42View} onValueChange={setR42View}>
-          <TabsList>
-            <TabsTrigger value="r42-monthly">Rule 42 — Monthly Apportionment</TabsTrigger>
-            <TabsTrigger value="r42-annual">Rule 42 — Annual Reconciliation</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="r42-monthly" className="mt-4">
-            <ErrorBoundary fallbackTitle="Error loading Rule 42 Monthly Report">
-              <Rule42MonthlyReport
-                invoices={invoices}
-                turnover={turnover}
-                filter={filter}
-                setFilter={setFilter}
-              />
-            </ErrorBoundary>
-          </TabsContent>
-          <TabsContent value="r42-annual" className="mt-4">
-            <ErrorBoundary fallbackTitle="Error loading Rule 42 Annual Reconciliation Report">
-              <Rule42AnnualReconciliationReport
-                invoices={invoices}
-                turnover={turnover}
-              />
-            </ErrorBoundary>
-          </TabsContent>
-        </Tabs>
+        <ErrorBoundary fallbackTitle="Error loading Rule 42 Monthly Report">
+          <Rule42MonthlyReport
+            invoices={invoices}
+            turnover={turnover}
+            filter={filter}
+            setFilter={setFilter}
+          />
+        </ErrorBoundary>
       ) : (
         <ErrorBoundary fallbackTitle="Error loading Combined Reversals Summary">
           <CombinedReversalsSummary invoices={invoices} turnover={turnover} />
