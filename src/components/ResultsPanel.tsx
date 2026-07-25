@@ -722,26 +722,25 @@ function Rule42AnnualReconciliationReport({
   invoices: Invoice[];
   turnover: Record<string, MonthlyTurnover>;
 }) {
-  const allMonths = useMemo(() => {
-    const set = new Map<string, Date>();
-    for (const inv of invoices) {
-      if ((inv.itemType ?? "capital_good") === "capital_good") continue;
-      if (!inv.purchaseDate) continue;
-      const d = new Date(inv.purchaseDate);
-      if (!isNaN(d.getTime())) {
-        const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-        set.set(mk, new Date(d.getFullYear(), d.getMonth(), 1));
-      }
-    }
-    return Array.from(set.values()).sort((a, b) => a.getTime() - b.getTime());
-  }, [invoices]);
-
   const availableYears = useMemo(() => {
     const ys = new Set<number>();
-    for (const d of allMonths) ys.add(fyStartYear(d));
+    for (const inv of invoices) {
+      if (inv.purchaseDate) {
+        const d = new Date(inv.purchaseDate);
+        if (!isNaN(d.getTime())) ys.add(fyStartYear(d));
+      }
+    }
+    for (const k of Object.keys(turnover)) {
+      const yr = Number(k.slice(0, 4));
+      const mth = Number(k.slice(5, 7));
+      if (!isNaN(yr) && !isNaN(mth)) {
+        const d = new Date(yr, mth - 1, 1);
+        if (!isNaN(d.getTime())) ys.add(fyStartYear(d));
+      }
+    }
     if (ys.size === 0) ys.add(fyStartYear(new Date()));
     return Array.from(ys).sort((a, b) => a - b);
-  }, [allMonths]);
+  }, [invoices, turnover]);
 
   const [selectedFy, setSelectedFy] = useState<number>(() => {
     return availableYears[availableYears.length - 1] ?? fyStartYear(new Date());
@@ -760,19 +759,20 @@ function Rule42AnnualReconciliationReport({
 
   const recon = useMemo(() => {
     try {
-      return reconcileRule42Annual(invoices, turnover, effectiveFy);
+      const r = reconcileRule42Annual(invoices, turnover, effectiveFy);
+      if (r && r.annualC2 && r.variance) return r;
     } catch (e) {
       console.error("Annual Recon calculation error:", e);
-      return reconcileRule42Annual([], {}, effectiveFy);
     }
+    return reconcileRule42Annual([], {}, effectiveFy || fyStartYear(new Date()));
   }, [invoices, turnover, effectiveFy]);
 
-  const sumC2 = recon.annualC2.igst + recon.annualC2.cgst + recon.annualC2.sgst;
-  const sumReqD1 = recon.requiredD1.igst + recon.requiredD1.cgst + recon.requiredD1.sgst;
-  const sumReqD2 = recon.requiredD2.igst + recon.requiredD2.cgst + recon.requiredD2.sgst;
-  const sumReqReversal = recon.requiredTotalReversal.igst + recon.requiredTotalReversal.cgst + recon.requiredTotalReversal.sgst;
-  const sumActualReversed = recon.sumMonthlyReversed.igst + recon.sumMonthlyReversed.cgst + recon.sumMonthlyReversed.sgst;
-  const sumVariance = recon.variance.igst + recon.variance.cgst + recon.variance.sgst;
+  const sumC2 = (recon?.annualC2?.igst ?? 0) + (recon?.annualC2?.cgst ?? 0) + (recon?.annualC2?.sgst ?? 0);
+  const sumReqD1 = (recon?.requiredD1?.igst ?? 0) + (recon?.requiredD1?.cgst ?? 0) + (recon?.requiredD1?.sgst ?? 0);
+  const sumReqD2 = (recon?.requiredD2?.igst ?? 0) + (recon?.requiredD2?.cgst ?? 0) + (recon?.requiredD2?.sgst ?? 0);
+  const sumReqReversal = (recon?.requiredTotalReversal?.igst ?? 0) + (recon?.requiredTotalReversal?.cgst ?? 0) + (recon?.requiredTotalReversal?.sgst ?? 0);
+  const sumActualReversed = (recon?.sumMonthlyReversed?.igst ?? 0) + (recon?.sumMonthlyReversed?.cgst ?? 0) + (recon?.sumMonthlyReversed?.sgst ?? 0);
+  const sumVariance = (recon?.variance?.igst ?? 0) + (recon?.variance?.cgst ?? 0) + (recon?.variance?.sgst ?? 0);
 
   const isShortfall = sumVariance > 0.01;
   const isRefund = sumVariance < -0.01;
