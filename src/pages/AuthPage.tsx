@@ -67,7 +67,7 @@ export function AuthPage() {
           <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 shadow-sm border border-primary/20">
             <Calculator className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Rule 43 ITC Calculator</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Rule 42 &amp; 43 ITC Calculator</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-xs">
             100% serverless and private capital goods reversal manager.
           </p>
