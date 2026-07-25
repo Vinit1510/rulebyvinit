@@ -12,7 +12,7 @@ import { PlusCircle, Trash2 } from "lucide-react";
 import {
   type Invoice, type CreditNote, type DebitNote, type GstComponents,
   formatINR, newInvoice as makeInvoice, newCreditNote, newDebitNote, type UsageType,
-  totalGstRate, computeItcComponents, type ItemType,
+  totalGstRate, computeItcComponents, type ItemType, type NonBusinessUseType,
 } from "@/lib/rule43";
 
 interface Props {
@@ -264,31 +264,95 @@ export function InvoiceForm({ open, initial, onClose, onSave }: Props) {
 
           {/* Usage type */}
           <div className="space-y-2">
-            <Label>Usage type</Label>
+            <Label>Business Usage Type</Label>
             <RadioGroup
-              value={inv.usage}
-              onValueChange={(v) => update({ usage: v as UsageType })}
-              className={`grid gap-2 ${isCapGood ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}
+              value={inv.usage === "non-business" ? "common" : inv.usage}
+              onValueChange={(v) => {
+                const u = v as UsageType;
+                if (u === "taxable" || u === "exempt") {
+                  update({ usage: u, nonBusinessUse: inv.nonBusinessUse === "100_personal" ? "100_personal" : "100_business" });
+                } else {
+                  update({ usage: u });
+                }
+              }}
+              className="grid gap-2 grid-cols-3"
             >
-              {(isCapGood
-                ? (["taxable", "exempt", "common"] as UsageType[])
-                : (["taxable", "exempt", "common", "non-business"] as UsageType[])
-              ).map((u) => (
-                <label key={u} className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 hover-elevate text-xs sm:text-sm">
-                  <RadioGroupItem value={u} />
-                  <span className="capitalize">
-                    {u === "common"
-                      ? "Common Use"
-                      : u === "taxable"
-                      ? "Taxable only"
-                      : u === "exempt"
-                      ? "Exempt only"
-                      : "Personal Use"}
-                  </span>
+              {[
+                { key: "taxable", label: "Taxable Only (T4)", desc: "Exclusively taxable/zero-rated" },
+                { key: "exempt", label: "Exempt Only (T2)", desc: "Exclusively exempt supplies" },
+                { key: "common", label: "Common Use (C2)", desc: "Taxable + Exempt / Common" },
+              ].map((item) => (
+                <label key={item.key} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 hover-elevate text-xs transition-all ${inv.usage === item.key ? "border-teal-500 bg-teal-500/5 dark:bg-teal-950/20 shadow-xs" : "border-border"}`}>
+                  <RadioGroupItem value={item.key} className="mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-foreground block">{item.label}</span>
+                    <span className="text-[10px] text-muted-foreground block leading-tight">{item.desc}</span>
+                  </div>
                 </label>
               ))}
             </RadioGroup>
           </div>
+
+          {/* Personal vs Business Use Section (Rule 42 Inputs/Services) */}
+          {!isCapGood && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground">Personal / Business Use Classification</Label>
+                <span className="text-[10px] bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full">Rule 42 (j)</span>
+              </div>
+
+              <RadioGroup
+                value={
+                  inv.usage === "non-business" || inv.nonBusinessUse === "100_personal"
+                    ? "100_personal"
+                    : inv.nonBusinessUse === "partial_personal"
+                    ? "partial_personal"
+                    : "100_business"
+                }
+                onValueChange={(val) => {
+                  const nb = val as NonBusinessUseType;
+                  if (nb === "100_personal") {
+                    update({ nonBusinessUse: "100_personal", usage: "non-business" });
+                  } else if (nb === "partial_personal") {
+                    update({ nonBusinessUse: "partial_personal", usage: "common" });
+                  } else {
+                    update({ nonBusinessUse: "100_business", usage: inv.usage === "non-business" ? "common" : inv.usage });
+                  }
+                }}
+                className="grid gap-2.5 grid-cols-1 sm:grid-cols-3"
+              >
+                <label className={`flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-xs bg-background ${inv.nonBusinessUse !== "100_personal" && inv.nonBusinessUse !== "partial_personal" && inv.usage !== "non-business" ? "border-teal-600 bg-teal-500/10 font-semibold" : ""}`}>
+                  <RadioGroupItem value="100_business" className="mt-0.5" />
+                  <div>
+                    <span className="block font-medium">100% Business Use</span>
+                    <span className="text-[10px] text-muted-foreground block">No personal element</span>
+                  </div>
+                </label>
+
+                <label className={`flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-xs bg-background ${inv.usage === "non-business" || inv.nonBusinessUse === "100_personal" ? "border-amber-600 bg-amber-500/10 font-semibold" : ""}`}>
+                  <RadioGroupItem value="100_personal" className="mt-0.5" />
+                  <div>
+                    <span className="block font-medium">100% Personal Use (T1)</span>
+                    <span className="text-[10px] text-muted-foreground block">Fully ineligible (Sec 17(1))</span>
+                  </div>
+                </label>
+
+                <label className={`flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-xs bg-background ${inv.nonBusinessUse === "partial_personal" ? "border-rose-600 bg-rose-500/10 font-semibold" : ""}`}>
+                  <RadioGroupItem value="partial_personal" className="mt-0.5" />
+                  <div>
+                    <span className="block font-medium text-rose-700 dark:text-rose-400">Partial Personal (D2)</span>
+                    <span className="text-[10px] text-muted-foreground block">Triggers 5% D2 Reversal</span>
+                  </div>
+                </label>
+              </RadioGroup>
+
+              {inv.nonBusinessUse === "partial_personal" && (
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded px-2.5 py-1.5 font-medium mt-1">
+                  ⚡ <strong>Rule 42 Notice:</strong> Common credit will be subject to a <strong>5% D2 Reversal</strong> ($D_2 = C_2 \times 5\%$) for non-business element under clause (j).
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Block Credit (Section 17(5)) */}
           <div className={`rounded-md border p-3 ${inv.blockCredit ? "border-destructive/40 bg-destructive/5" : "border-border"}`}>

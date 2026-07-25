@@ -187,8 +187,11 @@ function Rule42MonthlyReport({
   }
 
   const sumT = totT.igst + totT.cgst + totT.sgst;
+  const sumD1 = totD1.igst + totD1.cgst + totD1.sgst;
+  const sumD2 = totD2.igst + totD2.cgst + totD2.sgst;
   const sumReversal = totReversal.igst + totReversal.cgst + totReversal.sgst;
   const sumEligible = totEligible.igst + totEligible.cgst + totEligible.sgst;
+  const anyD2Applied = rows.some((r) => r.d2Applied);
 
   const handlePdf = () => {
     const filename = `Rule-42-Apportionment-${filterFilenameSuffix(filter)}.pdf`;
@@ -217,10 +220,10 @@ function Rule42MonthlyReport({
       <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
 
       {/* Summary totals block */}
-      <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground">Total Inward ITC (T)</div>
+            <div className="text-xs text-muted-foreground font-medium">Total Inward ITC (T)</div>
             <div className="num text-xl font-bold text-primary mt-1">{formatINR(sumT)}</div>
             <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
               <span>I:{formatINR(totT.igst)}</span>
@@ -229,20 +232,36 @@ function Rule42MonthlyReport({
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-destructive/5 border-destructive/20">
+        <Card className="bg-amber-500/5 border-amber-500/20">
           <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground">Total ITC Reversal (D1 + D2)</div>
-            <div className="num text-xl font-bold text-destructive mt-1">{formatINR(sumReversal)}</div>
-            <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
-              <span>I:{formatINR(totReversal.igst)}</span>
-              <span>C:{formatINR(totReversal.cgst)}</span>
-              <span>S:{formatINR(totReversal.sgst)}</span>
+            <div className="text-xs text-muted-foreground font-medium">Exempt Reversal (D1)</div>
+            <div className="num text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{formatINR(sumD1)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Based on E/F ratio</div>
+          </CardContent>
+        </Card>
+        <Card className={`border-2 transition-all ${anyD2Applied ? "bg-rose-500/10 border-rose-500/40 shadow-sm" : "bg-muted/30 border-border"}`}>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-rose-700 dark:text-rose-300">⭐ Non-Business Reversal (D2)</div>
+              {anyD2Applied ? (
+                <Badge variant="outline" className="text-[9px] bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-500/30">
+                  5% Active
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">
+                  0% (N/A)
+                </Badge>
+              )}
+            </div>
+            <div className="num text-xl font-black text-rose-600 dark:text-rose-400 mt-1">{formatINR(sumD2)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">
+              {anyD2Applied ? "Clause (j) 5% applied on partial personal items" : "No partial personal element declared"}
             </div>
           </CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/20 dark:bg-green-950/10">
           <CardContent className="py-4">
-            <div className="text-xs text-muted-foreground">Net Eligible ITC Claimed</div>
+            <div className="text-xs text-muted-foreground font-medium">Net Eligible ITC Claimed</div>
             <div className="num text-xl font-bold text-green-700 dark:text-green-400 mt-1">{formatINR(sumEligible)}</div>
             <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
               <span>I:{formatINR(totEligible.igst)}</span>
@@ -280,7 +299,7 @@ function Rule42MonthlyReport({
                   <TableHead className="text-right font-medium">Common (C2)</TableHead>
                   <TableHead className="text-right">Ratio (E/F)</TableHead>
                   <TableHead className="text-right text-destructive bg-destructive/5">Exempt Rev (D1)</TableHead>
-                  <TableHead className="text-right text-destructive bg-destructive/5">Non-Bus Rev (D2)</TableHead>
+                  <TableHead className="text-right text-rose-600 font-bold bg-rose-500/10 border-x border-rose-500/20">⭐ Non-Bus Rev (D2)</TableHead>
                   <TableHead className="text-right text-green-600 font-semibold bg-green-500/5">Net Eligible</TableHead>
                 </TableRow>
               </TableHeader>
@@ -316,7 +335,12 @@ function Rule42MonthlyReport({
                         <TableCell className="text-right num font-medium">{formatINR(c2Val)}</TableCell>
                         <TableCell className="text-right num">{(r.exemptRatio * 100).toFixed(1)}%</TableCell>
                         <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d1Val)}</TableCell>
-                        <TableCell className="text-right num text-destructive bg-destructive/5 font-medium">{formatINRPrecise(d2Val)}</TableCell>
+                        <TableCell className={`text-right num font-bold ${r.d2Applied ? "text-rose-700 dark:text-rose-300 bg-rose-500/15 border-x border-rose-500/30" : "text-muted-foreground bg-muted/20"}`}>
+                          {formatINRPrecise(d2Val)}
+                          <span className={`text-[9px] block font-mono ${r.d2Applied ? "text-rose-600 dark:text-rose-400 font-bold" : "text-muted-foreground"}`}>
+                            {r.d2Applied ? "5% Applied" : "0% (N/A)"}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right num text-green-700 dark:text-green-400 bg-green-500/5 font-bold text-sm">{formatINRPrecise(eligVal)}</TableCell>
                       </TableRow>
                     );

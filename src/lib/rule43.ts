@@ -37,6 +37,8 @@ export interface UsageChangeInput {
   newUsage?: UsageType;
 }
 
+export type NonBusinessUseType = "100_business" | "100_personal" | "partial_personal";
+
 export interface Invoice extends GstComponents {
   id: string;
   invoiceNo: string;
@@ -46,6 +48,7 @@ export interface Invoice extends GstComponents {
   purchaseDate: string;
   taxableValue: number;
   usage: UsageType;
+  nonBusinessUse?: NonBusinessUseType;
   disposal: DisposalInput;
   usageChange: UsageChangeInput;
   creditNotes?: CreditNote[];
@@ -233,6 +236,7 @@ export function newInvoice(): Invoice {
     cgstRate: 0,
     sgstRate: 0,
     usage: "taxable",
+    nonBusinessUse: "100_business",
     disposal: { enabled: false },
     usageChange: { enabled: false },
     creditNotes: [],
@@ -610,11 +614,12 @@ export interface Rule42MonthResult {
   c2: GstAmounts; // Common credit = C1 - T4
   exemptRatio: number; // E/F
   d1: GstAmounts; // Reversal due to exempt = C2 * (E/F)
-  d2: GstAmounts; // Reversal due to non-business = C2 * 5%
+  d2: GstAmounts; // Reversal due to non-business = C2 * 5% (only if partial personal use exists)
   c3: GstAmounts; // Net common credit = C2 - (D1+D2)
   eligibleItc: GstAmounts; // Final eligible credit = T4 + C3
   totalReversal: GstAmounts; // D1 + D2
   invoiceCount: number;
+  d2Applied: boolean;
 }
 
 export function computeRule42Month(
@@ -637,6 +642,7 @@ export function computeRule42Month(
   const t2 = { igst: 0, cgst: 0, sgst: 0 };
   const t3 = { igst: 0, cgst: 0, sgst: 0 };
   const t4 = { igst: 0, cgst: 0, sgst: 0 };
+  let hasPartialPersonalCommon = false;
 
   for (const inv of monthInvoices) {
     const amt = computeInvoiceItc(inv);
@@ -644,11 +650,14 @@ export function computeRule42Month(
     totalItc.cgst += amt.cgst;
     totalItc.sgst += amt.sgst;
 
+    const is100Personal = inv.nonBusinessUse === "100_personal" || inv.usage === "non-business";
+    const isPartialPersonal = inv.nonBusinessUse === "partial_personal";
+
     if (inv.blockCredit) {
       t3.igst += amt.igst;
       t3.cgst += amt.cgst;
       t3.sgst += amt.sgst;
-    } else if (inv.usage === "non-business") {
+    } else if (is100Personal) {
       t1.igst += amt.igst;
       t1.cgst += amt.cgst;
       t1.sgst += amt.sgst;
@@ -660,6 +669,10 @@ export function computeRule42Month(
       t4.igst += amt.igst;
       t4.cgst += amt.cgst;
       t4.sgst += amt.sgst;
+    } else if (inv.usage === "common") {
+      if (isPartialPersonal) {
+        hasPartialPersonalCommon = true;
+      }
     }
   }
 
@@ -686,10 +699,11 @@ export function computeRule42Month(
     sgst: c2.sgst * exemptRatio,
   };
 
+  const d2Factor = hasPartialPersonalCommon ? 0.05 : 0;
   const d2 = {
-    igst: c2.igst * 0.05,
-    cgst: c2.cgst * 0.05,
-    sgst: c2.sgst * 0.05,
+    igst: c2.igst * d2Factor,
+    cgst: c2.cgst * d2Factor,
+    sgst: c2.sgst * d2Factor,
   };
 
   const c3 = {
@@ -727,6 +741,7 @@ export function computeRule42Month(
     eligibleItc,
     totalReversal,
     invoiceCount: monthInvoices.length,
+    d2Applied: hasPartialPersonalCommon,
   };
 }
 
@@ -821,6 +836,8 @@ export function reconcileRule42Annual(
   }
 
   const annualExemptRatio = safeRatio(annualExemptTurnover, annualTotalTurnover);
+  const hasAnyPartialPersonalInYear = months.some((m) => m.d2Applied);
+  const annualD2Factor = hasAnyPartialPersonalInYear ? 0.05 : 0;
 
   const requiredD1 = {
     igst: annualC2.igst * annualExemptRatio,
@@ -829,9 +846,9 @@ export function reconcileRule42Annual(
   };
 
   const requiredD2 = {
-    igst: annualC2.igst * 0.05,
-    cgst: annualC2.cgst * 0.05,
-    sgst: annualC2.sgst * 0.05,
+    igst: annualC2.igst * annualD2Factor,
+    cgst: annualC2.cgst * annualD2Factor,
+    sgst: annualC2.sgst * annualD2Factor,
   };
 
   const requiredTotalReversal = {

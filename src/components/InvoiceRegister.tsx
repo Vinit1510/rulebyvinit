@@ -282,13 +282,28 @@ export function InvoiceRegister({ invoices, onSave, onDelete, onImport }: Props)
                             {isCap ? formatINR(tm) : <span className="text-muted-foreground italic text-xs">Rule 42 (N/A)</span>}
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="outline" className="text-[10px] capitalize">{inv.usage}</Badge>
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {inv.usage === "non-business" ? "Personal (T1)" : inv.usage === "common" ? "Common (C2)" : inv.usage === "taxable" ? "Taxable (T4)" : "Exempt (T2)"}
+                              </Badge>
+                              {!isCap && (inv.nonBusinessUse === "partial_personal") && (
+                                <Badge variant="outline" className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 font-semibold">
+                                  D2 Applies (5%)
+                                </Badge>
+                              )}
+                              {!isCap && (inv.nonBusinessUse === "100_personal" || inv.usage === "non-business") && (
+                                <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-semibold">
+                                  100% Personal (T1)
+                                </Badge>
+                              )}
+                              {inv.blockCredit && (
+                                <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                                  Blocked 17(5)
+                                </Badge>
+                              )}
                               {inv.disposal.enabled && <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">Disposed</Badge>}
                               {inv.usageChange.enabled && <Badge variant="outline" className="text-[10px]">Usage chg</Badge>}
                               {cnCount > 0 && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-400/30">{cnCount} CN</Badge>}
                               {dnCount > 0 && <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-700 dark:text-green-400 border-green-400/30">{dnCount} DN</Badge>}
-                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1 justify-end">

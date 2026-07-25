@@ -426,9 +426,14 @@ export function exportRule42Pdf(opts: Rule42PdfOptions, filename: string) {
   doc.setFontSize(10);
   doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
 
+  const sumD1 = opts.rows.reduce((s, r) => s + (r.d1.igst + r.d1.cgst + r.d1.sgst), 0);
+  const sumD2 = opts.rows.reduce((s, r) => s + (r.d2.igst + r.d2.cgst + r.d2.sgst), 0);
+
   // Summary block
   const summaryRows: Array<[string, string]> = [
     ["Total Inward ITC (T)", fmt(opts.totalT)],
+    ["Exempt Supplies Reversal (D1)", fmt(sumD1)],
+    ["⭐ Non-Business Reversal (D2 - Clause j 5%)", fmt(sumD2)],
     ["Total ITC Reversal (D1 + D2)", fmt(opts.totalReversal)],
     ["Net Eligible ITC Claimed", fmt(opts.totalEligible)],
   ];

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { type Invoice, type UsageType, type ItemType, newInvoice } from "@/lib/rule43";
+import { type Invoice, type UsageType, type ItemType, type NonBusinessUseType, newInvoice } from "@/lib/rule43";
 import { downloadImportTemplate } from "@/lib/excel";
 
 interface Props {
@@ -27,6 +27,7 @@ interface ParsedRow {
   sgstRate?: number;
   gstRate?: number;  // legacy / convenience alias — treated as IGST
   usage?: UsageType;
+  nonBusinessUse?: NonBusinessUseType;
   itemType?: ItemType;
   notes?: string;
   blockCredit?: boolean;
@@ -90,6 +91,12 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   "rate": "gstRate",
   "usage": "usage",
   "usage type": "usage",
+  "personal use": "nonBusinessUse",
+  "personal use type": "nonBusinessUse",
+  "non business use": "nonBusinessUse",
+  "non business": "nonBusinessUse",
+  "d2 trigger": "nonBusinessUse",
+  "d2": "nonBusinessUse",
   "item type": "itemType",
   "type": "itemType",
   "category": "itemType",
@@ -177,6 +184,13 @@ function parseUsage(v: string): UsageType {
   return "common";
 }
 
+function parseNonBusinessUse(v: string): NonBusinessUseType {
+  const val = (v ?? "").trim().toLowerCase();
+  if (val.includes("partial") || val.includes("d2")) return "partial_personal";
+  if (val.includes("100% personal") || val.includes("100_personal") || val === "personal" || val === "t1") return "100_personal";
+  return "100_business";
+}
+
 function parseItemType(v: string): ItemType {
   const val = v.trim().toLowerCase();
   if (val.includes("service") || val === "s") return "service";
@@ -216,6 +230,13 @@ function rowToInvoice(row: ParsedRow): Invoice {
   const cgstRate = hasExplicit ? (row.cgstRate ?? 0) : 0;
   const sgstRate = hasExplicit ? (row.sgstRate ?? 0) : 0;
 
+  let usage = row.usage ?? "taxable";
+  let nonBusinessUse = row.nonBusinessUse ?? "100_business";
+
+  if (usage === "non-business") {
+    nonBusinessUse = "100_personal";
+  }
+
   return {
     ...base,
     invoiceNo: row.invoiceNo ?? "",
@@ -227,7 +248,8 @@ function rowToInvoice(row: ParsedRow): Invoice {
     igstRate,
     cgstRate,
     sgstRate,
-    usage: row.usage ?? "taxable",
+    usage,
+    nonBusinessUse,
     itemType: row.itemType ?? "capital_good",
     notes: row.notes,
     blockCredit: row.blockCredit ?? false,
@@ -267,6 +289,8 @@ function parseRawRows(rawRows: Record<string, string>[]): { invoices: Invoice[];
         row.purchaseDate = parseDate(val);
       } else if (field === "usage") {
         row.usage = parseUsage(val);
+      } else if (field === "nonBusinessUse") {
+        row.nonBusinessUse = parseNonBusinessUse(val);
       } else if (field === "itemType") {
         row.itemType = parseItemType(val);
       } else if (field === "blockCredit") {
