@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,10 +22,21 @@ function GoogleIcon() {
 }
 
 export function AuthPage() {
-  const { signIn, loading, clientId, updateClientId } = useAuth();
+  const { signIn, loading, clientId, updateClientId, isSignedIn } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showConfig, setShowConfig] = useState(false);
   const [tempClientId, setTempClientId] = useState(clientId);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      toast({
+        title: "Signed in successfully!",
+        description: "Google Drive Sync is active. Loading your dashboard...",
+      });
+      setLocation("/dashboard");
+    }
+  }, [isSignedIn, setLocation, toast]);
 
   const saveClientId = (e: React.FormEvent) => {
     e.preventDefault();
