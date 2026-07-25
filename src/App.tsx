@@ -23,7 +23,7 @@ import { useCalculator } from "@/hooks/useCalculator";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { unionMonths } from "@/lib/rule43";
-import { getAdminSettings, verifyActivationCode } from "@/lib/firebase";
+import { getAdminSettings, verifyActivationCode, logUserSignIn } from "@/lib/firebase";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -375,6 +375,9 @@ function ProtectedRoute() {
       }
 
       if (isSignedIn && !isOfflineMode) {
+        if (user?.email) {
+          logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
+        }
         (async () => {
           const settings = await getAdminSettings();
           const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;

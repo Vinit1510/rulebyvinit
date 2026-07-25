@@ -36,6 +36,9 @@ export function AuthPage() {
   useEffect(() => {
     if (isSignedIn) {
       (async () => {
+        if (user?.email) {
+          logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
+        }
         const settings = await getAdminSettings();
         const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
 
@@ -74,6 +77,9 @@ export function AuthPage() {
         localStorage.setItem("r43_activated_code", res.doc.code);
       }
       await updateCodeStatus(res.doc.id, "redeemed", user?.email);
+      if (user?.email) {
+        logUserSignIn(user.email, user.name || "", user.picture, res.doc.code).catch(console.error);
+      }
       toast({
         title: "Activation Successful!",
         description: `Code ${res.doc.code} verified for ${user?.email || "your account"}. Redirecting to dashboard...`,
