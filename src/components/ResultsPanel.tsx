@@ -60,10 +60,18 @@ const MONTH_NAMES = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan"
 const MONTH_INDEX: Record<string, number> = { Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11, Jan:0, Feb:1, Mar:2 };
 
 /** Returns the Indian financial year start year for a given Date (Apr–Mar). */
-function fyStartYear(d: Date): number {
+function fyStartYear(d?: Date | null): number {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) {
+    const now = new Date();
+    return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  }
   return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
 }
-function fyLabel(y: number): string { return `${y}-${String((y + 1) % 100).padStart(2, "0")}`; }
+function fyLabel(y?: number | null): string {
+  const numY = Number(y);
+  if (!numY || isNaN(numY)) return "2025-26";
+  return `${numY}-${String((numY + 1) % 100).padStart(2, "0")}`;
+}
 
 type FilterMode = "year" | "month" | "range";
 interface ReportFilter {
@@ -270,7 +278,69 @@ function Rule42MonthlyReport({
             </div>
           </CardContent>
         </Card>
-      </div>
+      {/* GSTR-3B Table 4 Filing Summary Card */}
+      <Card className="border-teal-500/30 bg-teal-500/5 dark:bg-teal-950/20 shadow-sm">
+        <CardHeader className="py-3 px-5 border-b border-teal-500/20 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-teal-600 text-white hover:bg-teal-700 text-[10px] font-bold uppercase tracking-wider">
+              GSTR-3B Portal Ready
+            </Badge>
+            <h4 className="text-sm font-bold text-foreground">FORM GSTR-3B Table 4 Head-wise Bifurcation ({filterTitle(filter)})</h4>
+          </div>
+          <span className="text-[11px] text-muted-foreground italic font-medium">Head-wise IGST / CGST / SGST breakdown for GSTR-3B filing</span>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="text-xs">
+                <TableHead className="font-bold text-foreground">GSTR-3B Table 4 Section</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">Integrated Tax (IGST ₹)</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">Central Tax (CGST ₹)</TableHead>
+                <TableHead className="text-right font-bold text-teal-700 dark:text-teal-400">State/UT Tax (SGST ₹)</TableHead>
+                <TableHead className="text-right font-bold text-foreground">Total Amount (₹)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-xs font-medium">
+              <TableRow className="hover:bg-muted/30">
+                <TableCell className="font-medium">
+                  <span className="font-bold text-foreground">4(A)(5)</span> All other ITC Credited (Gross C1)
+                </TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.igst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.cgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totC1.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold text-foreground">{formatINRPrecise(totC1.igst + totC1.cgst + totC1.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-destructive/10 bg-destructive/5 text-destructive">
+                <TableCell className="font-medium">
+                  <span className="font-bold">4(B)(1)</span> Reversals u/r 42 &amp; 43 (<strong className="font-bold">D1 + D2</strong>)
+                </TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.igst + totD2.igst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.cgst + totD2.cgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totD1.sgst + totD2.sgst)}</TableCell>
+                <TableCell className="text-right num font-black text-sm">{formatINRPrecise(sumReversal)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-muted/30 text-amber-700 dark:text-amber-400">
+                <TableCell className="font-medium">
+                  <span className="font-bold">4(B)(2)</span> Other Reversals (T1 Non-Bus + T3 Blocked)
+                </TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.igst + totT3.igst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.cgst + totT3.cgst)}</TableCell>
+                <TableCell className="text-right num font-semibold">{formatINRPrecise(totT1.sgst + totT3.sgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totT1.igst + totT3.igst + totT1.cgst + totT3.cgst + totT1.sgst + totT3.sgst)}</TableCell>
+              </TableRow>
+              <TableRow className="hover:bg-green-500/20 bg-green-500/10 font-bold text-green-700 dark:text-green-300 text-sm">
+                <TableCell>
+                  <span>4(C)</span> Net ITC Available (T4 + C3)
+                </TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.igst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.cgst)}</TableCell>
+                <TableCell className="text-right num font-bold">{formatINRPrecise(totEligible.sgst)}</TableCell>
+                <TableCell className="text-right num font-black text-base">{formatINRPrecise(sumEligible)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Apportionment breakdown table */}
       <Card>
@@ -386,9 +456,25 @@ function Rule42AnnualReconciliationReport({
     return availableYears[availableYears.length - 1] ?? fyStartYear(new Date());
   });
 
+  const effectiveFy = useMemo(() => {
+    if (availableYears.length === 0) return fyStartYear(new Date());
+    return availableYears.includes(selectedFy) ? selectedFy : availableYears[availableYears.length - 1];
+  }, [availableYears, selectedFy]);
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedFy)) {
+      setSelectedFy(availableYears[availableYears.length - 1]);
+    }
+  }, [availableYears, selectedFy]);
+
   const recon = useMemo(() => {
-    return reconcileRule42Annual(invoices, turnover, selectedFy);
-  }, [invoices, turnover, selectedFy]);
+    try {
+      return reconcileRule42Annual(invoices, turnover, effectiveFy);
+    } catch (e) {
+      console.error("Annual Recon calculation error:", e);
+      return reconcileRule42Annual([], {}, effectiveFy);
+    }
+  }, [invoices, turnover, effectiveFy]);
 
   const sumC2 = recon.annualC2.igst + recon.annualC2.cgst + recon.annualC2.sgst;
   const sumReqD1 = recon.requiredD1.igst + recon.requiredD1.cgst + recon.requiredD1.sgst;
@@ -422,7 +508,7 @@ function Rule42AnnualReconciliationReport({
         <CardContent className="py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground font-semibold">Select Financial Year</span>
-            <Select value={String(selectedFy)} onValueChange={(v) => setSelectedFy(Number(v))}>
+            <Select value={String(effectiveFy)} onValueChange={(v) => setSelectedFy(Number(v))}>
               <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {availableYears.map((y) => (
