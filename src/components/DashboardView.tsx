@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Calculator, BookOpen, Layers,
-  ArrowRight, ShieldCheck, HelpCircle
+  ArrowRight, ShieldCheck
 } from "lucide-react";
 
 interface Props {
@@ -124,21 +124,6 @@ export function DashboardView({ onNavigate }: Props) {
           );
         })}
       </div>
-
-      {/* Quick Compliance Notice */}
-      <Card className="bg-card/40 backdrop-blur border rounded-2xl shadow-sm">
-        <CardContent className="py-5 px-6 flex gap-4 items-start text-xs leading-relaxed text-muted-foreground">
-          <HelpCircle className="h-5 w-5 text-teal-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <span className="font-bold text-foreground block">How Apportionment Reversals Work Legally:</span>
-            <p>
-              Both Rule 42 &amp; Rule 43 utilize the exempt turnover ratio ($E/F$) from your Turnover entries. 
-              **Rule 42** reverses inputs and services on a monthly basis with a flat 5% deemed personal reversal on common credits, reconciled at the end of the year. 
-              **Rule 43** amortizes capital goods over 60 months, reversing the exempt portion period-by-period. All combined monthly reversals must be declared in **GSTR-3B Table 4(B)**.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
