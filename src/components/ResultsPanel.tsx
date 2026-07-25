@@ -278,6 +278,8 @@ function Rule42MonthlyReport({
             </div>
           </CardContent>
         </Card>
+      </div>
+
       {/* Head-wise ITC & Reversal Summary Card */}
       <Card className="border-teal-500/30 bg-teal-500/5 dark:bg-teal-950/20 shadow-sm">
         <CardHeader className="py-3 px-5 border-b border-teal-500/20 flex flex-row items-center justify-between">
