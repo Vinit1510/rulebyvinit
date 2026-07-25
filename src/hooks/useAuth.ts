@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { logUserSignIn } from "@/lib/firebase";
 
 export interface GoogleUser {
   email: string;
@@ -102,6 +103,7 @@ export function useAuth() {
           if (profile) {
             setUser(profile);
             localStorage.setItem(USER_KEY, JSON.stringify(profile));
+            logUserSignIn(profile.email, profile.name, profile.picture).catch(console.error);
           }
           setLoading(false);
         },

@@ -1,0 +1,237 @@
+const PROJECT_ID = "gst-rule-42-43-calculator";
+const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+export interface AdminSettings {
+  activationRequired: boolean;
+  adminPin?: string;
+  updatedAt?: string;
+}
+
+export interface ActivationCode {
+  id: string;
+  code: string;
+  clientName: string;
+  status: "active" | "redeemed" | "revoked";
+  createdAt: string;
+  usedByEmail?: string;
+  usedAt?: string;
+}
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  firstLogin: string;
+  lastLogin: string;
+  codeUsed?: string;
+  status: "active" | "blocked";
+}
+
+/** Helper to extract Firestore JSON values */
+function parseFirestoreDoc(doc: any): any {
+  if (!doc || !doc.fields) return {};
+  const out: Record<string, any> = { id: doc.name.split("/").pop() };
+  for (const [key, value] of Object.entries<any>(doc.fields)) {
+    if (value.stringValue !== undefined) out[key] = value.stringValue;
+    else if (value.booleanValue !== undefined) out[key] = value.booleanValue;
+    else if (value.integerValue !== undefined) out[key] = Number(value.integerValue);
+    else if (value.doubleValue !== undefined) out[key] = Number(value.doubleValue);
+    else if (value.timestampValue !== undefined) out[key] = value.timestampValue;
+  }
+  return out;
+}
+
+/** Helper to format JS object into Firestore field values */
+function formatFirestoreFields(data: Record<string, any>): Record<string, any> {
+  const fields: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (key === "id") continue;
+    if (typeof val === "boolean") fields[key] = { booleanValue: val };
+    else if (typeof val === "number") fields[key] = { doubleValue: val };
+    else fields[key] = { stringValue: String(val ?? "") };
+  }
+  return fields;
+}
+
+/** Get Master Admin Settings */
+export async function getAdminSettings(): Promise<AdminSettings> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config`);
+    if (res.ok) {
+      const doc = await res.json();
+      const parsed = parseFirestoreDoc(doc);
+      return {
+        activationRequired: Boolean(parsed.activationRequired ?? false),
+        updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      };
+    }
+  } catch (e) {
+    console.error("Failed to fetch admin settings:", e);
+  }
+  return { activationRequired: false };
+}
+
+/** Update Master Admin Settings (Toggle Activation Code requirement ON/OFF) */
+export async function updateAdminSettings(settings: Partial<AdminSettings>): Promise<boolean> {
+  try {
+    const fields = formatFirestoreFields({
+      ...settings,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config?updateMask.fieldPaths=activationRequired&updateMask.fieldPaths=updatedAt`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to update admin settings:", e);
+    return false;
+  }
+}
+
+/** Get all Activation Codes */
+export async function getActivationCodes(): Promise<ActivationCode[]> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE_URL}/activation_codes`);
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.documents || [];
+      return docs.map(parseFirestoreDoc);
+    }
+  } catch (e) {
+    console.error("Failed to fetch activation codes:", e);
+  }
+  return [];
+}
+
+/** Create a new Activation Code */
+export async function createActivationCode(code: string, clientName: string): Promise<ActivationCode | null> {
+  try {
+    const id = `code_${Date.now()}`;
+    const record: ActivationCode = {
+      id,
+      code: code.toUpperCase().trim(),
+      clientName: clientName.trim() || "General Client",
+      status: "active",
+      createdAt: new Date().toISOString(),
+    };
+
+    const res = await fetch(`${FIRESTORE_BASE_URL}/activation_codes?documentId=${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: formatFirestoreFields(record) }),
+    });
+
+    if (res.ok) {
+      return record;
+    }
+  } catch (e) {
+    console.error("Failed to create activation code:", e);
+  }
+  return null;
+}
+
+/** Update / Revoke Activation Code Status */
+export async function updateCodeStatus(codeId: string, status: "active" | "revoked" | "redeemed", usedByEmail?: string): Promise<boolean> {
+  try {
+    const data: Record<string, any> = { status };
+    if (usedByEmail) {
+      data.usedByEmail = usedByEmail;
+      data.usedAt = new Date().toISOString();
+    }
+    const fields = formatFirestoreFields(data);
+    const query = Object.keys(data).map(k => `updateMask.fieldPaths=${k}`).join("&");
+
+    const res = await fetch(`${FIRESTORE_BASE_URL}/activation_codes/${codeId}?${query}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to update code status:", e);
+    return false;
+  }
+}
+
+/** Verify if an activation code is valid and active */
+export async function verifyActivationCode(inputCode: string): Promise<{ valid: boolean; doc?: ActivationCode; message?: string }> {
+  try {
+    const codes = await getActivationCodes();
+    const cleanInput = inputCode.trim().toUpperCase();
+    const match = codes.find(c => c.code === cleanInput);
+
+    if (!match) {
+      return { valid: false, message: "Invalid activation code." };
+    }
+    if (match.status === "revoked") {
+      return { valid: false, message: "This activation code has been revoked by admin." };
+    }
+    return { valid: true, doc: match };
+  } catch (e) {
+    console.error("Verify code error:", e);
+    return { valid: false, message: "Failed to verify code. Please check your internet connection." };
+  }
+}
+
+/** Get all Registered Users */
+export async function getRegisteredUsers(): Promise<UserRecord[]> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE_URL}/users`);
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.documents || [];
+      return docs.map(parseFirestoreDoc);
+    }
+  } catch (e) {
+    console.error("Failed to fetch registered users:", e);
+  }
+  return [];
+}
+
+/** Log User Sign-In / Registration */
+export async function logUserSignIn(email: string, name: string, picture?: string, codeUsed?: string): Promise<boolean> {
+  try {
+    const cleanEmail = email.toLowerCase().trim();
+    const docId = cleanEmail.replace(/[^a-z0-9]/gi, "_");
+    const now = new Date().toISOString();
+
+    const existingRes = await fetch(`${FIRESTORE_BASE_URL}/users/${docId}`);
+    let record: Record<string, any> = {
+      email: cleanEmail,
+      name: name || cleanEmail.split("@")[0],
+      picture: picture || "",
+      lastLogin: now,
+      status: "active",
+    };
+
+    if (codeUsed) record.codeUsed = codeUsed;
+
+    if (existingRes.ok) {
+      // User exists — update last login
+      const fields = formatFirestoreFields(record);
+      const query = Object.keys(record).map(k => `updateMask.fieldPaths=${k}`).join("&");
+      await fetch(`${FIRESTORE_BASE_URL}/users/${docId}?${query}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+    } else {
+      // New user — set firstLogin
+      record.firstLogin = now;
+      const fields = formatFirestoreFields(record);
+      await fetch(`${FIRESTORE_BASE_URL}/users/${docId}?documentId=${docId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+    }
+    return true;
+  } catch (e) {
+    console.error("Failed to log user sign-in:", e);
+    return false;
+  }
+}

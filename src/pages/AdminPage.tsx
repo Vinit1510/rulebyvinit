@@ -1,22 +1,147 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Key, ArrowLeft, CheckCircle2, AlertTriangle, Save } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  ShieldCheck, Key, ArrowLeft, CheckCircle2, AlertTriangle, Save,
+  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+import {
+  getAdminSettings, updateAdminSettings, getActivationCodes,
+  createActivationCode, updateCodeStatus, getRegisteredUsers,
+  type ActivationCode, type UserRecord, type AdminSettings
+} from "@/lib/firebase";
 
 export function AdminPage() {
   const { clientId, updateClientId } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [tempClientId, setTempClientId] = useState(clientId);
 
-  const handleSave = (e: React.FormEvent) => {
+  // State
+  const [tempClientId, setTempClientId] = useState(clientId);
+  const [loading, setLoading] = useState(true);
+  const [savingToggle, setSavingToggle] = useState(false);
+  const [settings, setSettings] = useState<AdminSettings>({ activationRequired: false });
+  const [codes, setCodes] = useState<ActivationCode[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
+
+  // Code Generation State
+  const [newClientName, setNewClientName] = useState("");
+  const [customCodeInput, setCustomCodeInput] = useState("");
+  const [creatingCode, setCreatingCode] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Search Filter State
+  const [userSearch, setUserSearch] = useState("");
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [s, c, u] = await Promise.all([
+        getAdminSettings(),
+        getActivationCodes(),
+        getRegisteredUsers(),
+      ]);
+      setSettings(s);
+      setCodes(c);
+      setUsers(u);
+    } catch (e) {
+      console.error("Admin load error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Handle Activation Toggle
+  const handleToggleActivation = async (checked: boolean) => {
+    setSavingToggle(true);
+    const success = await updateAdminSettings({ activationRequired: checked });
+    setSavingToggle(false);
+    if (success) {
+      setSettings((prev) => ({ ...prev, activationRequired: checked }));
+      toast({
+        title: checked ? "Activation Code Enforcement ENABLED" : "Trial Mode ENABLED (OFF)",
+        description: checked
+          ? "New users must enter a valid activation code to access the app."
+          : "Trial mode active: Anyone can sign in with Google freely without an activation code.",
+      });
+    } else {
+      toast({
+        title: "Failed to update setting",
+        description: "Please check your internet connection.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Generate Code Helper
+  const generateRandomCode = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let rand = "";
+    for (let i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `R43-${rand}`;
+  };
+
+  // Handle Code Creation
+  const handleCreateCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalCode = customCodeInput.trim() || generateRandomCode();
+    setCreatingCode(true);
+
+    const created = await createActivationCode(finalCode, newClientName);
+    setCreatingCode(false);
+
+    if (created) {
+      setCodes((prev) => [created, ...prev]);
+      setNewClientName("");
+      setCustomCodeInput("");
+      toast({
+        title: "Activation Code Created!",
+        description: `Code ${created.code} for "${created.clientName}" is live.`,
+      });
+    } else {
+      toast({
+        title: "Failed to create code",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle Code Revocation / Status change
+  const handleToggleCodeStatus = async (codeId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "revoked" ? "active" : "revoked";
+    const ok = await updateCodeStatus(codeId, nextStatus);
+    if (ok) {
+      setCodes((prev) =>
+        prev.map((c) => (c.id === codeId ? { ...c, status: nextStatus } : c))
+      );
+      toast({
+        title: `Code ${nextStatus === "revoked" ? "Revoked" : "Re-activated"}`,
+        description: `Status updated to ${nextStatus}.`,
+      });
+    }
+  };
+
+  // Handle Copy to Clipboard
+  const handleCopy = (codeText: string, id: string) => {
+    navigator.clipboard.writeText(codeText);
+    setCopiedId(id);
+    toast({ title: "Code Copied!", description: `${codeText} copied to clipboard.` });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // Handle Save Client ID
+  const handleSaveClientId = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempClientId.trim()) {
       toast({
@@ -28,94 +153,344 @@ export function AdminPage() {
     }
     updateClientId(tempClientId.trim());
     toast({
-      title: "Client ID Saved Successfully!",
-      description: "Google OAuth credentials have been updated for this application.",
+      title: "Client ID Saved!",
+      description: "Google OAuth credentials updated.",
     });
   };
 
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10 relative overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute top-1/4 left-1/4 w-[350px] h-[350px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+  const filteredUsers = users.filter(
+    (u) =>
+      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.name.toLowerCase().includes(userSearch.toLowerCase())
+  );
 
-      <div className="w-full max-w-lg relative z-10 space-y-6">
-        <div className="flex items-center justify-between">
+  return (
+    <div className="min-h-screen bg-background px-4 py-8 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             className="gap-2 text-xs font-semibold"
             onClick={() => setLocation("/sign-in")}
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Sign-in
+            <ArrowLeft className="h-4 w-4" /> Back to App
           </Button>
-
-          <span className="text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2.5 py-1 rounded-full border border-primary/20 flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5" /> Admin Panel
-          </span>
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" /> Master Administration Panel
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Secret URL: gstreversal.vercel.app/vinit — Hidden from clients
+            </p>
+          </div>
         </div>
 
-        <Card className="border border-border/80 shadow-lg">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Key className="h-5 w-5 text-primary" /> Google Credentials Administration
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Configure your master Google OAuth Client ID for cloud sync and backups. This page is hidden from standard client users.
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadData}
+          disabled={loading}
+          className="gap-1.5 text-xs font-semibold"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh Data
+        </Button>
+      </div>
+
+      {/* Grid Section 1: Activation Toggle & System Status */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Master ON/OFF Activation Toggle Card */}
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                {settings.activationRequired ? (
+                  <Lock className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <Unlock className="h-4 w-4 text-emerald-500" />
+                )}
+                Activation Code Enforcement
+              </CardTitle>
+
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  settings.activationRequired
+                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                }`}
+              >
+                {settings.activationRequired ? "ON (Code Required)" : "OFF (Trial Mode)"}
+              </span>
+            </div>
+            <CardDescription className="text-xs mt-1">
+              Toggle whether new users must enter a valid activation code to access the calculator.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="p-3.5 rounded-lg border text-xs flex items-center gap-3 bg-muted/30">
-              {clientId ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-emerald-600 dark:text-emerald-400">Google OAuth Configured</p>
-                    <p className="text-muted-foreground text-[11px]">Client ID is active and ready for user sign-in.</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-amber-600 dark:text-amber-400">Client ID Missing</p>
-                    <p className="text-muted-foreground text-[11px]">Enter your Google OAuth Client ID below to enable cloud sync.</p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="admin-client-id" className="text-xs font-semibold flex items-center gap-1.5">
-                  Google OAuth Client ID
-                </Label>
-                <Input
-                  id="admin-client-id"
-                  placeholder="e.g. 1234567890-abcdef.apps.googleusercontent.com"
-                  value={tempClientId}
-                  onChange={(e) => setTempClientId(e.target.value)}
-                  className="text-xs h-10 font-mono"
-                  required
-                />
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3.5 bg-muted/40 rounded-lg border">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold">
+                  {settings.activationRequired
+                    ? "Enforce Code for New Users"
+                    : "Trial Mode (Free Access)"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {settings.activationRequired
+                    ? "Users will be asked to enter a valid code after signing in."
+                    : "Users can sign in with Google and use the app freely without any code."}
+                </p>
               </div>
 
-              <Button type="submit" className="w-full h-10 text-xs font-semibold gap-2">
-                <Save className="h-4 w-4" /> Save Credentials
-              </Button>
-            </form>
-
-            <div className="space-y-2 pt-2 border-t text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">Google Cloud Console Setup Instructions:</p>
-              <ol className="list-decimal pl-4 space-y-1 text-[11px] leading-relaxed">
-                <li>Go to <strong>Google Cloud Console</strong> &gt; APIs &amp; Services &gt; Credentials.</li>
-                <li>Create an OAuth 2.0 Web Client ID.</li>
-                <li>Add <code>{typeof window !== "undefined" ? window.location.origin : "https://gstreversal.vercel.app"}</code> to <strong>Authorized JavaScript Origins</strong>.</li>
-                <li>Enable the <strong>Google Drive API</strong> in API Library.</li>
-              </ol>
+              <Switch
+                checked={settings.activationRequired}
+                onCheckedChange={handleToggleActivation}
+                disabled={savingToggle}
+              />
             </div>
           </CardContent>
         </Card>
+
+        {/* Google OAuth Client ID Card */}
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Key className="h-4 w-4 text-primary" /> Google OAuth Credentials
+              </CardTitle>
+              {clientId ? (
+                <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  Configured
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Missing
+                </span>
+              )}
+            </div>
+            <CardDescription className="text-xs">
+              Master Client ID used for Google Sign-In and Google Drive Cloud Sync.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveClientId} className="space-y-3">
+              <div className="space-y-1">
+                <Input
+                  placeholder="e.g. 1234567890-xyz.apps.googleusercontent.com"
+                  value={tempClientId}
+                  onChange={(e) => setTempClientId(e.target.value)}
+                  className="text-xs h-9 font-mono"
+                  required
+                />
+              </div>
+              <Button type="submit" size="sm" className="w-full h-8 text-xs font-semibold gap-1.5">
+                <Save className="h-3.5 w-3.5" /> Save Client ID
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Grid Section 2: Activation Code Generator */}
+      <Card className="border border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-primary" /> Generate Activation Codes
+            </CardTitle>
+            <span className="text-xs text-muted-foreground font-semibold">
+              Total Codes: {codes.length}
+            </span>
+          </div>
+          <CardDescription className="text-xs">
+            Create single-use or client-assigned activation codes to give specific clients access.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
+            <div>
+              <Label className="text-[11px] font-semibold">Client Name / Label</Label>
+              <Input
+                placeholder="e.g. Acme CA Firm"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="text-xs h-8 bg-background mt-1"
+                required
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] font-semibold">Custom Code (Optional)</Label>
+              <Input
+                placeholder="Leave blank for auto-generate"
+                value={customCodeInput}
+                onChange={(e) => setCustomCodeInput(e.target.value)}
+                className="text-xs h-8 bg-background mt-1 uppercase font-mono"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" size="sm" disabled={creatingCode} className="w-full h-8 text-xs font-semibold gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> {creatingCode ? "Generating..." : "Generate Code"}
+              </Button>
+            </div>
+          </form>
+
+          {/* List of Created Activation Codes */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="max-h-56 overflow-y-auto divide-y">
+              {codes.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  No activation codes created yet. Fill the form above to generate your first code.
+                </div>
+              ) : (
+                codes.map((c) => (
+                  <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
+                    <div className="flex items-center gap-3">
+                      <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
+                        {c.code}
+                      </code>
+                      <div>
+                        <p className="font-semibold text-foreground leading-tight">{c.clientName}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Created: {new Date(c.createdAt).toLocaleDateString()}
+                          {c.usedByEmail && ` • Used by: ${c.usedByEmail}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                          c.status === "active"
+                            ? "bg-emerald-500/15 text-emerald-600"
+                            : c.status === "redeemed"
+                            ? "bg-blue-500/15 text-blue-600"
+                            : "bg-red-500/15 text-red-600"
+                        }`}
+                      >
+                        {c.status}
+                      </span>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleCopy(c.code, c.id)}
+                        title="Copy Code"
+                      >
+                        {copiedId === c.id ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                        onClick={() => handleToggleCodeStatus(c.id, c.status)}
+                        title={c.status === "revoked" ? "Re-activate Code" : "Revoke Code"}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Grid Section 3: Live Registered Users Table */}
+      <Card className="border border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" /> Live Registered Users Directory
+              </CardTitle>
+              <CardDescription className="text-xs">
+                View all clients/users who have signed in and used your application.
+              </CardDescription>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold bg-primary/10 text-primary px-2.5 py-1 rounded-full border border-primary/20">
+                {users.length} Users Registered
+              </span>
+              <div className="relative w-48">
+                <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search email..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="text-xs h-8 pl-8"
+                />
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="p-3">User</th>
+                  <th className="p-3">Email Address</th>
+                  <th className="p-3">First Login</th>
+                  <th className="p-3">Last Active</th>
+                  <th className="p-3">Code Used</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-4 text-center text-muted-foreground text-xs">
+                      No user records found. Users will automatically appear here once they log in.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="p-3 font-semibold text-foreground flex items-center gap-2">
+                        {u.picture ? (
+                          <img src={u.picture} alt="" className="h-6 w-6 rounded-full border" />
+                        ) : (
+                          <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
+                            {(u.name || u.email).slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <span>{u.name || "User"}</span>
+                      </td>
+                      <td className="p-3 font-mono text-muted-foreground">{u.email}</td>
+                      <td className="p-3 text-muted-foreground">
+                        {u.firstLogin ? new Date(u.firstLogin).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {u.lastLogin ? new Date(u.lastLogin).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                      <td className="p-3">
+                        {u.codeUsed ? (
+                          <code className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border">{u.codeUsed}</code>
+                        ) : (
+                          <span className="text-muted-foreground italic">None (Trial)</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <span className="text-[10px] font-semibold uppercase bg-emerald-500/15 text-emerald-600 px-2 py-0.5 rounded border border-emerald-500/30">
+                          {u.status || "Active"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
