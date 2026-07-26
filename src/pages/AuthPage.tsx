@@ -84,17 +84,18 @@ export function AuthPage() {
     if (res.valid && res.doc) {
       if (typeof window !== "undefined") {
         localStorage.setItem("r43_activated_code", res.doc.code);
+        localStorage.setItem("r43_working_offline", "true");
       }
-      await updateCodeStatus(res.doc.id, "redeemed", user?.email);
+      await updateCodeStatus(res.doc.id, "redeemed", user?.email || "offline_user");
       if (user?.email) {
         logUserSignIn(user.email, user.name || "", user.picture, res.doc.code).catch(console.error);
       }
       toast({
         title: "Activation Successful!",
-        description: `Code ${res.doc.code} verified for ${user?.email || "your account"}. Redirecting to dashboard...`,
+        description: `Code ${res.doc.code} verified. Loading workspace...`,
       });
       setShowActivationModal(false);
-      setLocation("/dashboard");
+      window.location.href = basePath + "/";
     } else {
       toast({
         title: "Activation Failed",
@@ -155,7 +156,17 @@ export function AuthPage() {
               type="button"
               variant="outline"
               className="w-full py-6 text-sm font-semibold hover:shadow-md transition-all duration-200 border-dashed border-primary/40 bg-primary/5"
-              onClick={() => {
+              onClick={async () => {
+                const settings = await getAdminSettings();
+                const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+                if (settings.activationRequired && !storedCode) {
+                  toast({
+                    title: "Activation Code Required",
+                    description: "Code enforcement is enabled by Admin. Please enter your activation code to use Local Sandbox.",
+                  });
+                  setShowActivationModal(true);
+                  return;
+                }
                 if (typeof window !== "undefined") {
                   localStorage.setItem("r43_working_offline", "true");
                 }

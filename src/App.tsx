@@ -374,24 +374,25 @@ function ProtectedRoute() {
         return;
       }
 
-      if (isSignedIn && !isOfflineMode) {
-        if (user?.email) {
-          logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
-        }
-        (async () => {
-          const settings = await getAdminSettings();
-          const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+      if (isSignedIn && user?.email) {
+        logUserSignIn(user.email, user.name || "", user.picture).catch(console.error);
+      }
 
-          if (settings.activationRequired) {
-            if (!storedCode) {
-              if (active) {
-                setIsActivated(false);
-                setCheckingActivation(false);
-                setLocation("/sign-in");
-              }
-              return;
+      (async () => {
+        const settings = await getAdminSettings();
+        const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+
+        if (settings.activationRequired) {
+          if (!storedCode) {
+            if (active) {
+              setIsActivated(false);
+              setCheckingActivation(false);
+              setLocation("/sign-in");
             }
+            return;
+          }
 
+          if (navigator.onLine) {
             const check = await verifyActivationCode(storedCode, user?.email);
             if (!check.valid) {
               if (active) {
@@ -402,18 +403,13 @@ function ProtectedRoute() {
               return;
             }
           }
+        }
 
-          if (active) {
-            setIsActivated(true);
-            setCheckingActivation(false);
-          }
-        })();
-      } else {
         if (active) {
           setIsActivated(true);
           setCheckingActivation(false);
         }
-      }
+      })();
     }
 
     return () => {
@@ -423,7 +419,7 @@ function ProtectedRoute() {
 
   if (loading || checkingActivation) return <FullScreenLoader />;
   if (!isSignedIn && !isOfflineMode) return <FullScreenLoader />;
-  if (isSignedIn && !isOfflineMode && !isActivated) return <FullScreenLoader />;
+  if (!isActivated) return <FullScreenLoader />;
 
   return <MainApp />;
 }
