@@ -11,8 +11,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Check, ChevronDown, Info } from "lucide-react";
-import { type MonthlyTurnover, formatINR, monthKey, monthLabel } from "@/lib/rule43";
+import { Check, ChevronDown, Info, Lock } from "lucide-react";
+import { type MonthlyTurnover, formatINR, monthKey, monthLabel, isMonthWithinLicensedFY } from "@/lib/rule43";
 
 interface Props {
   months: Date[];
@@ -286,12 +286,23 @@ export function TurnoverTable({ months, turnover, setTurnover }: Props) {
                           const t = turnover[k] ?? { exempt: 0, taxable: 0 };
                           const total = (t.exempt || 0) + (t.taxable || 0);
                           const ratio = total > 0 ? Math.min(t.exempt / total, 1) : 0;
+                          const isMonthValid = isMonthWithinLicensedFY(k);
                           return (
                             <TableRow key={k} className="hover:bg-muted/40">
-                              <TableCell className="font-medium text-sm">{monthLabel(d)}</TableCell>
+                              <TableCell className="font-medium text-sm">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{monthLabel(d)}</span>
+                                  {!isMonthValid && (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5" title="License Renewal Required">
+                                      <Lock className="h-3 w-3" /> Locked
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell>
                                 <Input
                                   type="number" min={0} className="num text-right h-8" placeholder="0"
+                                  disabled={!isMonthValid}
                                   value={getDraft(k, t, "exempt")}
                                   onChange={(e) => updateDraft(k, "exempt", e.target.value)}
                                   onBlur={() => commitRow(d)}
@@ -301,6 +312,7 @@ export function TurnoverTable({ months, turnover, setTurnover }: Props) {
                               <TableCell>
                                 <Input
                                   type="number" min={0} className="num text-right h-8" placeholder="0"
+                                  disabled={!isMonthValid}
                                   value={getDraft(k, t, "taxable")}
                                   onChange={(e) => updateDraft(k, "taxable", e.target.value)}
                                   onBlur={() => commitRow(d)}

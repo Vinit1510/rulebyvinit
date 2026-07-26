@@ -39,6 +39,46 @@ export interface UsageChangeInput {
 
 export type NonBusinessUseType = "100_business" | "100_personal" | "partial_personal";
 
+/** Get active license FY from localStorage or default "2025-26" */
+export function getActiveLicenseFY(): string {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("r43_code_fy") || "2025-26";
+  }
+  return "2025-26";
+}
+
+/** Get maximum allowed invoice/turnover date based on license FY (e.g. 2026-03-31 for FY 2025-26) */
+export function getMaxLicensedDate(fy: string = getActiveLicenseFY()): Date {
+  const parts = fy.split("-");
+  let endYear = 2026;
+  if (parts.length === 2) {
+    const startYr = parseInt(parts[0], 10);
+    const endYrPart = parseInt(parts[1], 10);
+    if (!isNaN(startYr) && !isNaN(endYrPart)) {
+      endYear = endYrPart < 100 ? Math.floor(startYr / 100) * 100 + endYrPart : endYrPart;
+    }
+  }
+  return new Date(Date.UTC(endYear, 2, 31, 23, 59, 59)); // March 31st
+}
+
+/** Check if an invoice date string (YYYY-MM-DD) is within licensed FY boundary */
+export function isDateWithinLicensedFY(dateStr: string, fy: string = getActiveLicenseFY()): boolean {
+  if (!dateStr) return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+  const maxDate = getMaxLicensedDate(fy);
+  return d <= maxDate;
+}
+
+/** Check if a month string (YYYY-MM) is within licensed FY boundary */
+export function isMonthWithinLicensedFY(monthKey: string, fy: string = getActiveLicenseFY()): boolean {
+  if (!monthKey) return true;
+  const d = new Date(`${monthKey}-01`);
+  if (isNaN(d.getTime())) return true;
+  const maxDate = getMaxLicensedDate(fy);
+  return d <= maxDate;
+}
+
 export interface Invoice extends GstComponents {
   id: string;
   invoiceNo: string;

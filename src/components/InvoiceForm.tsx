@@ -13,6 +13,7 @@ import {
   type Invoice, type CreditNote, type DebitNote, type GstComponents,
   formatINR, newInvoice as makeInvoice, newCreditNote, newDebitNote, type UsageType,
   totalGstRate, computeItcComponents, type ItemType, type NonBusinessUseType,
+  isDateWithinLicensedFY, getActiveLicenseFY, getMaxLicensedDate
 } from "@/lib/rule43";
 
 interface Props {
@@ -582,11 +583,18 @@ export function InvoiceForm({ open, initial, onClose, onSave }: Props) {
           </Field>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!valid} onClick={() => { onSave(inv); onClose(); }}>
-            {initial ? "Save changes" : "Add invoice"}
-          </Button>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {inv.purchaseDate && !isDateWithinLicensedFY(inv.purchaseDate) && (
+            <p className="text-[11px] text-destructive font-semibold self-center text-center">
+              ⚠️ Date exceeds FY {getActiveLicenseFY()} license limit (Max: 31/03/20{getActiveLicenseFY().split("-")[1]}). Please request a license renewal.
+            </p>
+          )}
+          <div className="flex gap-2 justify-end w-full">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button disabled={!valid || !isDateWithinLicensedFY(inv.purchaseDate)} onClick={() => { onSave(inv); onClose(); }}>
+              {initial ? "Save changes" : "Add invoice"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
