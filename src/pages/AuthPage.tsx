@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calculator, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
+import { Calculator, KeyRound, CheckCircle2, Phone, Mail, RotateCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getAdminSettings, verifyActivationCode, updateCodeStatus } from "@/lib/firebase";
+import {
+  getAdminSettings, verifyActivationCode, updateCodeStatus,
+  logUserSignIn, createRenewalRequest
+} from "@/lib/firebase";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -31,7 +34,19 @@ export function AuthPage() {
   // Activation code state
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [inputCode, setInputCode] = useState("");
+  const [inputEmail, setInputEmail] = useState("");
+  const [inputMobile, setInputMobile] = useState("");
   const [verifying, setVerifying] = useState(false);
+
+  // Renewal request state when code is expired
+  const [isExpired, setIsExpired] = useState(false);
+  const [requestingRenewal, setRequestingRenewal] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) {
+      setInputEmail(user.email);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (isSignedIn) {
@@ -75,33 +90,82 @@ export function AuthPage() {
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputCode.trim()) return;
+    const cleanCode = inputCode.trim();
+    const finalEmail = (inputEmail || user?.email || "").trim();
+    const finalMobile = inputMobile.trim();
+
+    if (!cleanCode) {
+      toast({ title: "Activation code required", variant: "destructive" });
+      return;
+    }
+    if (!finalEmail) {
+      toast({ title: "Email address required", variant: "destructive" });
+      return;
+    }
+    if (!finalMobile || finalMobile.length < 10) {
+      toast({ title: "Valid 10-digit Mobile Number required", variant: "destructive" });
+      return;
+    }
 
     setVerifying(true);
-    const res = await verifyActivationCode(inputCode, user?.email);
+    const res = await verifyActivationCode(cleanCode, finalEmail, finalMobile);
     setVerifying(false);
 
     if (res.valid && res.doc) {
       if (typeof window !== "undefined") {
         localStorage.setItem("r43_activated_code", res.doc.code);
+        localStorage.setItem("r43_user_email", finalEmail);
+        localStorage.setItem("r43_user_mobile", finalMobile);
+        localStorage.setItem("r43_code_fy", res.doc.financialYear || "2025-26");
         localStorage.setItem("r43_working_offline", "true");
       }
-      await updateCodeStatus(res.doc.id, "redeemed", user?.email || "offline_user");
-      if (user?.email) {
-        logUserSignIn(user.email, user.name || "", user.picture, res.doc.code).catch(console.error);
-      }
+      await updateCodeStatus(res.doc.id, "redeemed", finalEmail, finalMobile);
+      logUserSignIn(finalEmail, user?.name || finalEmail.split("@")[0], user?.picture, res.doc.code, finalMobile, res.doc.financialYear).catch(console.error);
+
       toast({
         title: "Activation Successful!",
-        description: `Code ${res.doc.code} verified. Loading workspace...`,
+        description: `Code ${res.doc.code} verified for FY ${res.doc.financialYear || "2025-26"}. Loading workspace...`,
       });
       setShowActivationModal(false);
       window.location.href = basePath + "/";
     } else {
+      if (res.message?.includes("Expired")) {
+        setIsExpired(true);
+      }
       toast({
         title: "Activation Failed",
         description: res.message || "Invalid activation code.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRequestRenewal = async () => {
+    const finalEmail = (inputEmail || user?.email || "").trim();
+    const finalMobile = inputMobile.trim();
+    if (!finalEmail || !finalMobile) {
+      toast({ title: "Please fill Email & Mobile Number first", variant: "destructive" });
+      return;
+    }
+
+    setRequestingRenewal(true);
+    const ok = await createRenewalRequest({
+      userEmail: finalEmail,
+      userName: user?.name || finalEmail.split("@")[0],
+      userMobile: finalMobile,
+      currentCode: inputCode.trim(),
+      currentFY: "2025-26",
+      requestedFY: "2026-27",
+    });
+    setRequestingRenewal(false);
+
+    if (ok) {
+      toast({
+        title: "Renewal Request Submitted!",
+        description: "Your license renewal request for FY 2026-27 has been sent to Administrator.",
+      });
+    } else {
+      toast({ title: "Failed to submit request", description: "Please try again.", variant: "destructive" });
     }
   };
 
@@ -239,30 +303,74 @@ export function AuthPage() {
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <KeyRound className="h-5 w-5 text-primary" /> Enter Activation Code
+              <KeyRound className="h-5 w-5 text-primary" /> Enter Activation Details
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Activation Code enforcement is enabled by the Administrator. Please enter your assigned activation code to unlock access.
+              Code enforcement is active. Please enter your activation code, mobile number, and email ID.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleVerifyCode} className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Activation Code</Label>
+          <form onSubmit={handleVerifyCode} className="space-y-3.5 pt-2">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <KeyRound className="h-3.5 w-3.5 text-primary" /> Activation Code
+              </Label>
               <Input
                 placeholder="Enter Activation Code"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
-                className="text-sm font-mono tracking-wider uppercase h-10"
+                className="text-sm font-mono tracking-wider uppercase h-9"
                 required
                 autoFocus
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-primary" /> Email Address
+              </Label>
+              <Input
+                type="email"
+                placeholder="Enter your Email ID"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                className="text-xs h-9 font-mono"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-primary" /> Mobile Number
+              </Label>
+              <Input
+                type="tel"
+                placeholder="Enter 10-digit Mobile Number"
+                value={inputMobile}
+                onChange={(e) => setInputMobile(e.target.value)}
+                className="text-xs h-9 font-mono"
+                maxLength={10}
+                required
+              />
+            </div>
+
+            <div className="space-y-2 pt-1">
               <Button type="submit" disabled={verifying} className="w-full h-10 font-semibold text-xs">
-                {verifying ? "Verifying Code..." : "Activate & Continue to Dashboard"}
+                {verifying ? "Verifying Code..." : "Activate & Continue to Workspace"}
               </Button>
+
+              {isExpired && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={requestingRenewal}
+                  onClick={handleRequestRenewal}
+                  className="w-full h-9 text-xs font-semibold border-amber-500/40 bg-amber-500/15 text-amber-600 gap-1.5"
+                >
+                  <RotateCw className={`h-3.5 w-3.5 ${requestingRenewal ? "animate-spin" : ""}`} />
+                  Request FY 2026-27 License Renewal
+                </Button>
+              )}
 
               <Button
                 type="button"
@@ -278,7 +386,7 @@ export function AuthPage() {
                   window.location.reload();
                 }}
               >
-                Sign Out / Switch Google Account
+                Sign Out / Reset
               </Button>
             </div>
           </form>

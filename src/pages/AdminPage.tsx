@@ -5,16 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ShieldCheck, Key, ArrowLeft, Save,
-  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power
+  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power, Phone, CalendarCheck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import {
   getAdminSettings, updateAdminSettings, getActivationCodes,
   createActivationCode, updateCodeStatus, deleteActivationCode, getRegisteredUsers,
-  type ActivationCode, type UserRecord, type AdminSettings
+  getRenewalRequests, updateRenewalRequestStatus,
+  type ActivationCode, type UserRecord, type AdminSettings, type RenewalRequest
 } from "@/lib/firebase";
 
 export function AdminPage() {
@@ -40,10 +42,12 @@ export function AdminPage() {
   const [settings, setSettings] = useState<AdminSettings>({ activationRequired: false });
   const [codes, setCodes] = useState<ActivationCode[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [renewals, setRenewals] = useState<RenewalRequest[]>([]);
 
   // Code Generation State
   const [newClientName, setNewClientName] = useState("");
   const [customCodeInput, setCustomCodeInput] = useState("");
+  const [selectedFY, setSelectedFY] = useState("2025-26");
   const [creatingCode, setCreatingCode] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -53,14 +57,16 @@ export function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [s, c, u] = await Promise.all([
+      const [s, c, u, r] = await Promise.all([
         getAdminSettings(),
         getActivationCodes(),
         getRegisteredUsers(),
+        getRenewalRequests(),
       ]);
       setSettings(s);
       setCodes(c);
       setUsers(u);
+      setRenewals(r);
     } catch (e) {
       console.error("Admin load error:", e);
     } finally {
@@ -127,7 +133,7 @@ export function AdminPage() {
       toast({
         title: checked ? "Activation Code Enforcement ENABLED" : "Trial Mode ENABLED (OFF)",
         description: checked
-          ? "New & un-activated users must enter a valid activation code to access the app."
+          ? "Users must enter a valid activation code to access the app."
           : "Trial mode active: Anyone can sign in with Google freely without an activation code.",
       });
     } else {
@@ -153,7 +159,7 @@ export function AdminPage() {
     const finalCode = customCodeInput.trim() || generateRandomCode();
     setCreatingCode(true);
 
-    const created = await createActivationCode(finalCode, newClientName);
+    const created = await createActivationCode(finalCode, newClientName, selectedFY);
     setCreatingCode(false);
 
     if (created) {
@@ -162,7 +168,7 @@ export function AdminPage() {
       setCustomCodeInput("");
       toast({
         title: "Activation Code Created!",
-        description: `Code ${created.code} for "${created.clientName}" is live. Locked to 1 Gmail address upon redemption.`,
+        description: `Code ${created.code} for FY ${selectedFY} is live.`,
       });
     } else {
       toast({
@@ -208,6 +214,29 @@ export function AdminPage() {
     }
   };
 
+  // Handle Renewal Approval
+  const handleApproveRenewal = async (req: RenewalRequest) => {
+    const matchCode = codes.find(c => c.code === req.currentCode || c.usedByEmail === req.userEmail);
+    if (!matchCode) {
+      toast({ title: "Code record not found", description: "Please generate a new code for this client.", variant: "destructive" });
+      return;
+    }
+
+    const okCode = await updateCodeStatus(matchCode.id, "redeemed", req.userEmail, req.userMobile, req.requestedFY);
+    const okReq = await updateRenewalRequestStatus(req.id, "approved");
+
+    if (okCode && okReq) {
+      setCodes(prev => prev.map(c => c.id === matchCode.id ? { ...c, financialYear: req.requestedFY, status: "redeemed" } : c));
+      setRenewals(prev => prev.map(r => r.id === req.id ? { ...r, status: "approved" } : r));
+      toast({
+        title: "License Renewed Successfully!",
+        description: `License for ${req.userEmail} extended to FY ${req.requestedFY}.`,
+      });
+    } else {
+      toast({ title: "Failed to approve renewal", variant: "destructive" });
+    }
+  };
+
   // Handle Copy to Clipboard
   const handleCopy = (codeText: string, id: string) => {
     navigator.clipboard.writeText(codeText);
@@ -237,7 +266,8 @@ export function AdminPage() {
   const filteredUsers = users.filter(
     (u) =>
       u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.name.toLowerCase().includes(userSearch.toLowerCase())
+      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.mobile || "").includes(userSearch)
   );
 
   // If not authenticated as Admin: Show Admin Password Lock Screen
@@ -279,6 +309,8 @@ export function AdminPage() {
       </div>
     );
   }
+
+  const pendingRenewals = renewals.filter(r => r.status === "pending");
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 max-w-5xl mx-auto space-y-6">
@@ -325,13 +357,13 @@ export function AdminPage() {
       </div>
 
       {/* Summary Badges Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Total Registered Users</p>
+            <p className="text-xs text-muted-foreground">Total Users</p>
             <p className="text-lg font-bold">{users.length}</p>
           </div>
         </div>
@@ -347,15 +379,73 @@ export function AdminPage() {
         </div>
 
         <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+            <CalendarCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Pending Renewals</p>
+            <p className="text-lg font-bold">{pendingRenewals.length}</p>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border bg-card/60 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center font-bold">
             <Lock className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Deactivated Codes</p>
+            <p className="text-xs text-muted-foreground">Deactivated</p>
             <p className="text-lg font-bold">{codes.filter(c => c.status === "revoked").length}</p>
           </div>
         </div>
       </div>
+
+      {/* Pending License Renewal Requests Section */}
+      {pendingRenewals.length > 0 && (
+        <Card className="border border-amber-500/30 bg-amber-500/5 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <CalendarCheck className="h-4 w-4" /> Pending FY License Renewal Requests
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Clients requesting license extension for next Financial Year.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg overflow-hidden bg-background">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-muted/50 border-b text-[11px] font-semibold text-muted-foreground uppercase">
+                    <th className="p-3">Client Email</th>
+                    <th className="p-3">Mobile</th>
+                    <th className="p-3">Current Code</th>
+                    <th className="p-3">Requested FY</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pendingRenewals.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/20">
+                      <td className="p-3 font-semibold">{r.userEmail}</td>
+                      <td className="p-3 font-mono">{r.userMobile}</td>
+                      <td className="p-3"><code className="bg-muted px-1.5 py-0.5 rounded font-mono">{r.currentCode}</code></td>
+                      <td className="p-3 font-bold text-emerald-600">FY {r.requestedFY}</td>
+                      <td className="p-3 text-right">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 gap-1"
+                          onClick={() => handleApproveRenewal(r)}
+                        >
+                          <Check className="h-3.5 w-3.5" /> Approve Renewal
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Grid Section 1: Activation Toggle & Admin Password */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -396,7 +486,7 @@ export function AdminPage() {
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {settings.activationRequired
-                    ? "Strict Mode: All users (including existing trial users) must have a valid active code."
+                    ? "Strict Mode: All users must have a valid active code with un-expired FY."
                     : "Trial mode active: Anyone can sign in with Google freely without an activation code."}
                 </p>
               </div>
@@ -494,11 +584,11 @@ export function AdminPage() {
               </span>
             </div>
             <CardDescription className="text-xs">
-              Codes automatically lock to the first Gmail address that redeems them.
+              Codes automatically lock to the first Gmail address and expire on March 31st of selected FY.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
+            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3.5 bg-muted/30 rounded-lg border">
               <div>
                 <Label className="text-[11px] font-semibold">Client Name / Label</Label>
                 <Input
@@ -509,15 +599,31 @@ export function AdminPage() {
                   required
                 />
               </div>
+
+              <div>
+                <Label className="text-[11px] font-semibold">Financial Year Validity</Label>
+                <Select value={selectedFY} onValueChange={setSelectedFY}>
+                  <SelectTrigger className="h-8 text-xs bg-background mt-1">
+                    <SelectValue placeholder="Select FY" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2025-26">FY 2025-26 (Exp. March 2026)</SelectItem>
+                    <SelectItem value="2026-27">FY 2026-27 (Exp. March 2027)</SelectItem>
+                    <SelectItem value="2027-28">FY 2027-28 (Exp. March 2028)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div>
                 <Label className="text-[11px] font-semibold">Custom Code (Optional)</Label>
                 <Input
-                  placeholder="Leave blank to auto-generate"
+                  placeholder="Blank for auto"
                   value={customCodeInput}
                   onChange={(e) => setCustomCodeInput(e.target.value)}
                   className="text-xs h-8 bg-background mt-1 uppercase font-mono"
                 />
               </div>
+
               <div className="flex items-end">
                 <Button type="submit" size="sm" disabled={creatingCode} className="w-full h-8 text-xs font-semibold gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> {creatingCode ? "Generating..." : "Generate Code"}
@@ -540,10 +646,11 @@ export function AdminPage() {
                           {c.code}
                         </code>
                         <div>
-                          <p className="font-semibold text-foreground leading-tight">{c.clientName}</p>
+                          <p className="font-semibold text-foreground leading-tight">{c.clientName} <span className="text-[10px] text-emerald-600 font-mono font-bold">(FY {c.financialYear || "2025-26"})</span></p>
                           <p className="text-[10px] text-muted-foreground">
                             Created: {new Date(c.createdAt).toLocaleDateString()}
                             {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
+                            {c.usedByMobile && ` • Mobile: ${c.usedByMobile}`}
                           </p>
                         </div>
                       </div>
@@ -626,7 +733,7 @@ export function AdminPage() {
               <div className="relative w-48">
                 <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
                 <Input
-                  placeholder="Search email..."
+                  placeholder="Search email/mobile..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="text-xs h-8 pl-8"
@@ -642,9 +749,9 @@ export function AdminPage() {
                 <tr className="bg-muted/50 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   <th className="p-3">User</th>
                   <th className="p-3">Email Address</th>
+                  <th className="p-3">Mobile No</th>
                   <th className="p-3">First Login</th>
-                  <th className="p-3">Last Active</th>
-                  <th className="p-3">Code Used</th>
+                  <th className="p-3">Code / FY</th>
                   <th className="p-3">Status</th>
                 </tr>
               </thead>
@@ -669,15 +776,22 @@ export function AdminPage() {
                         <span>{u.name || "User"}</span>
                       </td>
                       <td className="p-3 font-mono text-muted-foreground">{u.email}</td>
+                      <td className="p-3 font-mono font-semibold text-foreground">
+                        {u.mobile ? (
+                          <span className="flex items-center gap-1"><Phone className="h-3 w-3 text-primary" /> {u.mobile}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic">—</span>
+                        )}
+                      </td>
                       <td className="p-3 text-muted-foreground">
                         {u.firstLogin ? new Date(u.firstLogin).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
                       </td>
-                      <td className="p-3 text-muted-foreground">
-                        {u.lastLogin ? new Date(u.lastLogin).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                      </td>
                       <td className="p-3">
                         {u.codeUsed ? (
-                          <code className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border">{u.codeUsed}</code>
+                          <div className="flex flex-col">
+                            <code className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border w-fit">{u.codeUsed}</code>
+                            {u.financialYear && <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">FY {u.financialYear}</span>}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground italic">None (Trial)</span>
                         )}

@@ -11,9 +11,12 @@ export interface ActivationCode {
   id: string;
   code: string;
   clientName: string;
-  status: "active" | "redeemed" | "revoked";
+  status: "active" | "redeemed" | "revoked" | "expired";
   createdAt: string;
+  financialYear: string; // e.g. "2025-26"
+  validUntil: string;    // ISO Date string e.g. "2026-03-31T23:59:59.000Z"
   usedByEmail?: string;
+  usedByMobile?: string;
   usedAt?: string;
 }
 
@@ -21,11 +24,25 @@ export interface UserRecord {
   id: string;
   email: string;
   name: string;
+  mobile?: string;
   picture?: string;
   firstLogin: string;
   lastLogin: string;
   codeUsed?: string;
+  financialYear?: string;
   status: "active" | "blocked";
+}
+
+export interface RenewalRequest {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userMobile: string;
+  currentCode: string;
+  currentFY: string;
+  requestedFY: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected";
 }
 
 /** Helper to extract Firestore JSON values */
@@ -54,6 +71,21 @@ function formatFirestoreFields(data: Record<string, any>): Record<string, any> {
   return fields;
 }
 
+/** Helper to calculate FY end date (March 31st of second year) */
+export function calculateFYEndDate(financialYear: string): string {
+  // financialYear format: "2025-26" -> end year 2026
+  const parts = financialYear.split("-");
+  let endYear = new Date().getFullYear();
+  if (parts.length === 2) {
+    const startYr = parseInt(parts[0], 10);
+    const endYrPart = parseInt(parts[1], 10);
+    if (!isNaN(startYr) && !isNaN(endYrPart)) {
+      endYear = endYrPart < 100 ? Math.floor(startYr / 100) * 100 + endYrPart : endYrPart;
+    }
+  }
+  return new Date(Date.UTC(endYear, 2, 31, 23, 59, 59)).toISOString(); // March 31
+}
+
 /** Get Master Admin Settings with 2.5s timeout */
 export async function getAdminSettings(): Promise<AdminSettings> {
   try {
@@ -75,7 +107,7 @@ export async function getAdminSettings(): Promise<AdminSettings> {
   return { activationRequired: false };
 }
 
-/** Update Master Admin Settings (Toggle Activation Code requirement ON/OFF) */
+/** Update Master Admin Settings */
 export async function updateAdminSettings(settings: Partial<AdminSettings>): Promise<boolean> {
   try {
     const fields = formatFirestoreFields({
@@ -110,15 +142,22 @@ export async function getActivationCodes(): Promise<ActivationCode[]> {
   return [];
 }
 
-/** Create a new Activation Code */
-export async function createActivationCode(code: string, clientName: string): Promise<ActivationCode | null> {
+/** Create a new Activation Code with Financial Year validity */
+export async function createActivationCode(
+  code: string,
+  clientName: string,
+  financialYear: string = "2025-26"
+): Promise<ActivationCode | null> {
   try {
     const id = `code_${Date.now()}`;
+    const validUntil = calculateFYEndDate(financialYear);
     const record: ActivationCode = {
       id,
       code: code.toUpperCase().trim(),
       clientName: clientName.trim() || "General Client",
       status: "active",
+      financialYear: financialYear.trim(),
+      validUntil,
       createdAt: new Date().toISOString(),
     };
 
@@ -137,14 +176,25 @@ export async function createActivationCode(code: string, clientName: string): Pr
   return null;
 }
 
-/** Update / Revoke Activation Code Status */
-export async function updateCodeStatus(codeId: string, status: "active" | "revoked" | "redeemed", usedByEmail?: string): Promise<boolean> {
+/** Update / Revoke / Renew Activation Code Status */
+export async function updateCodeStatus(
+  codeId: string,
+  status: "active" | "revoked" | "redeemed" | "expired",
+  usedByEmail?: string,
+  usedByMobile?: string,
+  newFY?: string
+): Promise<boolean> {
   try {
     const data: Record<string, any> = { status };
-    if (usedByEmail) {
-      data.usedByEmail = usedByEmail;
-      data.usedAt = new Date().toISOString();
+    if (usedByEmail) data.usedByEmail = usedByEmail;
+    if (usedByMobile) data.usedByMobile = usedByMobile;
+    if (status === "redeemed") data.usedAt = new Date().toISOString();
+    if (newFY) {
+      data.financialYear = newFY;
+      data.validUntil = calculateFYEndDate(newFY);
+      data.status = "redeemed";
     }
+
     const fields = formatFirestoreFields(data);
     const query = Object.keys(data).map(k => `updateMask.fieldPaths=${k}`).join("&");
 
@@ -173,10 +223,11 @@ export async function deleteActivationCode(codeId: string): Promise<boolean> {
   }
 }
 
-/** Verify if an activation code is valid, active, and lock it to 1 Gmail address */
+/** Verify if an activation code is valid, active, not expired, and lock it to 1 Gmail address & mobile */
 export async function verifyActivationCode(
   inputCode: string,
-  userEmail?: string
+  userEmail?: string,
+  userMobile?: string
 ): Promise<{ valid: boolean; doc?: ActivationCode; message?: string }> {
   try {
     const codes = await getActivationCodes();
@@ -193,6 +244,20 @@ export async function verifyActivationCode(
         message: "Account Access Suspended: Your activation code is pending, expired, or deactivated. Please contact support to activate your account.",
       };
     }
+
+    // Check Financial Year Expiry
+    if (match.validUntil) {
+      const expiryDate = new Date(match.validUntil);
+      if (new Date() > expiryDate) {
+        return {
+          valid: false,
+          doc: match,
+          message: `License Expired: Your code for FY ${match.financialYear || "2025-26"} expired on March 31. Please submit a renewal request to continue.`,
+        };
+      }
+    }
+
+    // Check Gmail Lock
     if (match.status === "redeemed" && match.usedByEmail) {
       if (cleanEmail && match.usedByEmail.toLowerCase() !== cleanEmail) {
         return {
@@ -223,8 +288,15 @@ export async function getRegisteredUsers(): Promise<UserRecord[]> {
   return [];
 }
 
-/** Log User Sign-In / Registration */
-export async function logUserSignIn(email: string, name: string, picture?: string, codeUsed?: string): Promise<boolean> {
+/** Log User Sign-In / Registration with Mobile Number */
+export async function logUserSignIn(
+  email: string,
+  name: string,
+  picture?: string,
+  codeUsed?: string,
+  mobile?: string,
+  fy?: string
+): Promise<boolean> {
   try {
     const cleanEmail = email.toLowerCase().trim();
     const docId = cleanEmail.replace(/[^a-z0-9]/gi, "_");
@@ -240,9 +312,10 @@ export async function logUserSignIn(email: string, name: string, picture?: strin
     };
 
     if (codeUsed) record.codeUsed = codeUsed;
+    if (mobile) record.mobile = mobile;
+    if (fy) record.financialYear = fy;
 
     if (existingRes.ok) {
-      // User exists — update last login
       const fields = formatFirestoreFields(record);
       const query = Object.keys(record).map(k => `updateMask.fieldPaths=${k}`).join("&");
       await fetch(`${FIRESTORE_BASE_URL}/users/${docId}?${query}`, {
@@ -251,7 +324,6 @@ export async function logUserSignIn(email: string, name: string, picture?: strin
         body: JSON.stringify({ fields }),
       });
     } else {
-      // New user — set firstLogin
       record.firstLogin = now;
       const fields = formatFirestoreFields(record);
       await fetch(`${FIRESTORE_BASE_URL}/users/${docId}?documentId=${docId}`, {
@@ -263,6 +335,59 @@ export async function logUserSignIn(email: string, name: string, picture?: strin
     return true;
   } catch (e) {
     console.error("Failed to log user sign-in:", e);
+    return false;
+  }
+}
+
+/** Submit a License Renewal Request from Client */
+export async function createRenewalRequest(req: Omit<RenewalRequest, "id" | "requestedAt" | "status">): Promise<boolean> {
+  try {
+    const id = `req_${Date.now()}`;
+    const record: RenewalRequest = {
+      ...req,
+      id,
+      requestedAt: new Date().toISOString(),
+      status: "pending",
+    };
+    const res = await fetch(`${FIRESTORE_BASE_URL}/renewal_requests?documentId=${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: formatFirestoreFields(record) }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create renewal request:", e);
+    return false;
+  }
+}
+
+/** Get all Renewal Requests for Admin */
+export async function getRenewalRequests(): Promise<RenewalRequest[]> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE_URL}/renewal_requests`);
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.documents || [];
+      return docs.map(parseFirestoreDoc);
+    }
+  } catch (e) {
+    console.error("Failed to fetch renewal requests:", e);
+  }
+  return [];
+}
+
+/** Approve / Reject Renewal Request */
+export async function updateRenewalRequestStatus(requestId: string, status: "approved" | "rejected"): Promise<boolean> {
+  try {
+    const fields = formatFirestoreFields({ status });
+    const res = await fetch(`${FIRESTORE_BASE_URL}/renewal_requests/${requestId}?updateMask.fieldPaths=status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to update renewal request status:", e);
     return false;
   }
 }
