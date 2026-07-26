@@ -10,6 +10,7 @@ import { ShieldCheck, CalendarCheck, RotateCw, Phone, CheckCircle2 } from "lucid
 import { useToast } from "@/hooks/use-toast";
 import { createRenewalRequest, getNextFinancialYear } from "@/lib/firebase";
 import { isLicenseInLastMonthOrExpired } from "@/lib/rule43";
+import { secureStorage } from "@/lib/secureStorage";
 
 interface Props {
   open: boolean;
@@ -21,14 +22,14 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
   const [requesting, setRequesting] = useState(false);
 
-  const activeCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
-  const userMobile = typeof window !== "undefined" ? localStorage.getItem("r43_user_mobile") : null;
-  const userFY = (typeof window !== "undefined" ? localStorage.getItem("r43_code_fy") : null) || "2026-27";
+  const activeCode = typeof window !== "undefined" ? secureStorage.getItem("r43_activated_code") : null;
+  const userMobile = typeof window !== "undefined" ? secureStorage.getItem("r43_user_mobile") : null;
+  const userFY = (typeof window !== "undefined" ? secureStorage.getItem("r43_code_fy") : null) || "2026-27";
   const nextFY = getNextFinancialYear(userFY);
   const isRenewalPeriod = isLicenseInLastMonthOrExpired(userFY);
 
   const handleRequestRenewal = async () => {
-    const email = user?.email || localStorage.getItem("r43_user_email") || "";
+    const email = user?.email || secureStorage.getItem("r43_user_email") || "";
     const mobile = userMobile || "";
 
     if (!email) {
@@ -94,7 +95,7 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
 
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold">Email Address</Label>
-            <Input value={user?.email ?? localStorage.getItem("r43_user_email") ?? "N/A"} readOnly className="text-xs h-8 bg-muted/40 cursor-default" />
+            <Input value={user?.email ?? secureStorage.getItem("r43_user_email") ?? "N/A"} readOnly className="text-xs h-8 bg-muted/40 cursor-default" />
           </div>
 
           {/* License Validity Badge Card */}

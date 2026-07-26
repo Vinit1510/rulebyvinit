@@ -12,6 +12,7 @@ import {
   getAdminSettings, verifyActivationCode, updateCodeStatus,
   logUserSignIn, createRenewalRequest
 } from "@/lib/firebase";
+import { secureStorage } from "@/lib/secureStorage";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -113,11 +114,11 @@ export function AuthPage() {
 
     if (res.valid && res.doc) {
       if (typeof window !== "undefined") {
-        localStorage.setItem("r43_activated_code", res.doc.code);
-        localStorage.setItem("r43_user_email", finalEmail);
-        localStorage.setItem("r43_user_mobile", finalMobile);
-        localStorage.setItem("r43_code_fy", res.doc.financialYear || "2025-26");
-        localStorage.setItem("r43_working_offline", "true");
+        secureStorage.setItem("r43_activated_code", res.doc.code);
+        secureStorage.setItem("r43_user_email", finalEmail);
+        secureStorage.setItem("r43_user_mobile", finalMobile);
+        secureStorage.setItem("r43_code_fy", res.doc.financialYear || "2026-27");
+        secureStorage.setItem("r43_working_offline", "true");
       }
       await updateCodeStatus(res.doc.id, "redeemed", finalEmail, finalMobile);
       logUserSignIn(finalEmail, user?.name || finalEmail.split("@")[0], user?.picture, res.doc.code, finalMobile, res.doc.financialYear).catch(console.error);

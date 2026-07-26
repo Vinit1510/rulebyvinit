@@ -10,6 +10,7 @@ import {
 import { isLicenseInLastMonthOrExpired, getActiveLicenseFY } from "@/lib/rule43";
 import { getNextFinancialYear, createRenewalRequest } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { secureStorage } from "@/lib/secureStorage";
 
 interface Props {
   onNavigate: (path: string) => void;
@@ -24,9 +25,9 @@ export function DashboardView({ onNavigate }: Props) {
   const showBanner = isLicenseInLastMonthOrExpired(userFY);
 
   const handleRequestRenewal = async () => {
-    const email = localStorage.getItem("r43_user_email") || "";
-    const mobile = localStorage.getItem("r43_user_mobile") || "";
-    const activeCode = localStorage.getItem("r43_activated_code") || "";
+    const email = secureStorage.getItem("r43_user_email") || "";
+    const mobile = secureStorage.getItem("r43_user_mobile") || "";
+    const activeCode = secureStorage.getItem("r43_activated_code") || "";
 
     setRequesting(true);
     const ok = await createRenewalRequest({

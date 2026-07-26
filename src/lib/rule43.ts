@@ -39,12 +39,14 @@ export interface UsageChangeInput {
 
 export type NonBusinessUseType = "100_business" | "100_personal" | "partial_personal";
 
-/** Get active license FY from localStorage or default "2025-26" */
+import { secureStorage } from "./secureStorage";
+
+/** Get active license FY from secureStorage or default "2026-27" */
 export function getActiveLicenseFY(): string {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("r43_code_fy") || "2025-26";
+    return secureStorage.getItem("r43_code_fy") || "2026-27";
   }
-  return "2025-26";
+  return "2026-27";
 }
 
 /** Get maximum allowed invoice/turnover date based on license FY (e.g. 2026-03-31 for FY 2025-26) */

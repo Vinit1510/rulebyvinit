@@ -18,6 +18,7 @@ import {
   getRenewalRequests, updateRenewalRequestStatus,
   type ActivationCode, type UserRecord, type AdminSettings, type RenewalRequest
 } from "@/lib/firebase";
+import { secureStorage } from "@/lib/secureStorage";
 
 export function AdminPage() {
   const { clientId, updateClientId } = useAuth();
@@ -27,7 +28,7 @@ export function AdminPage() {
   // Admin Password Authentication State
   const DEFAULT_ADMIN_PASS = "vinit@2026";
   const [adminPass, setAdminPass] = useState<string>(() => {
-    return (typeof window !== "undefined" && localStorage.getItem("r43_admin_master_pass")) || DEFAULT_ADMIN_PASS;
+    return (typeof window !== "undefined" && secureStorage.getItem("r43_admin_master_pass")) || DEFAULT_ADMIN_PASS;
   });
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return typeof window !== "undefined" && sessionStorage.getItem("r43_admin_authenticated") === "true";
@@ -114,7 +115,7 @@ export function AdminPage() {
     if (!newPassInput.trim()) return;
     setAdminPass(newPassInput.trim());
     if (typeof window !== "undefined") {
-      localStorage.setItem("r43_admin_master_pass", newPassInput.trim());
+      secureStorage.setItem("r43_admin_master_pass", newPassInput.trim());
     }
     setNewPassInput("");
     toast({

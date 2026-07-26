@@ -9,6 +9,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { ProfileDialog } from "@/components/ProfileDialog";
+import { secureStorage } from "@/lib/secureStorage";
 
 export function UserMenu() {
   const { user, signOut, isSignedIn } = useAuth();
@@ -18,7 +19,7 @@ export function UserMenu() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // If working in offline bypass mode, render a clean "Offline Workspace" menu
-  const isOffline = typeof window !== "undefined" && localStorage.getItem("r43_working_offline") === "true";
+  const isOffline = typeof window !== "undefined" && secureStorage.getItem("r43_working_offline") === "true";
 
   const handleExportBackup = () => {
     try {
@@ -60,7 +61,7 @@ export function UserMenu() {
   if (!isSignedIn && isOffline) {
     const handleSignOut = () => {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("r43_working_offline");
+        secureStorage.removeItem("r43_working_offline");
       }
       setLocation("/sign-in");
     };

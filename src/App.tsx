@@ -24,6 +24,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { unionMonths } from "@/lib/rule43";
 import { getAdminSettings, verifyActivationCode, logUserSignIn } from "@/lib/firebase";
+import { secureStorage } from "@/lib/secureStorage";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -360,7 +361,7 @@ function FullScreenLoader() {
 function ProtectedRoute() {
   const { isSignedIn, loading, user } = useAuth();
   const [, setLocation] = useLocation();
-  const isOfflineMode = typeof window !== "undefined" && localStorage.getItem("r43_working_offline") === "true";
+  const isOfflineMode = typeof window !== "undefined" && secureStorage.getItem("r43_working_offline") === "true";
 
   const [checkingActivation, setCheckingActivation] = useState(true);
   const [isActivated, setIsActivated] = useState(true);
@@ -380,7 +381,7 @@ function ProtectedRoute() {
 
       (async () => {
         const settings = await getAdminSettings();
-        const storedCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
+        const storedCode = typeof window !== "undefined" ? secureStorage.getItem("r43_activated_code") : null;
 
         if (settings.activationRequired) {
           if (!storedCode) {
