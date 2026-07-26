@@ -52,8 +52,25 @@ export function AdminPage() {
   const [creatingCode, setCreatingCode] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Search Filter State
+  // Search & Tab Filter State
   const [userSearch, setUserSearch] = useState("");
+  const [codeTabFilter, setCodeTabFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
+
+  const isCodeExpired = (c: ActivationCode) => {
+    if (!c.validUntil) return false;
+    return new Date() > new Date(c.validUntil);
+  };
+
+  const activeCodesList = codes.filter(c => c.status !== "revoked" && !isCodeExpired(c));
+  const expiredCodesList = codes.filter(c => c.status !== "revoked" && isCodeExpired(c));
+  const revokedCodesList = codes.filter(c => c.status === "revoked");
+
+  const filteredCodes = codes.filter((c) => {
+    if (codeTabFilter === "active") return c.status !== "revoked" && !isCodeExpired(c);
+    if (codeTabFilter === "expired") return c.status !== "revoked" && isCodeExpired(c);
+    if (codeTabFilter === "revoked") return c.status === "revoked";
+    return true;
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -629,42 +646,97 @@ export function AdminPage() {
               </div>
             </form>
 
+            {/* Code Filter Tabs: Active, Expired, Deactive / Blocked */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 pb-1 border-t">
+              <span className="text-xs font-bold text-foreground">Activation Codes Directory</span>
+              <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg border">
+                <Button
+                  variant={codeTabFilter === "all" ? "secondary" : "ghost"}
+                  size="sm"
+                  type="button"
+                  className="h-6 text-[11px] px-2 font-semibold"
+                  onClick={() => setCodeTabFilter("all")}
+                >
+                  All ({codes.length})
+                </Button>
+                <Button
+                  variant={codeTabFilter === "active" ? "secondary" : "ghost"}
+                  size="sm"
+                  type="button"
+                  className="h-6 text-[11px] px-2 font-semibold text-emerald-600 dark:text-emerald-400"
+                  onClick={() => setCodeTabFilter("active")}
+                >
+                  Active ({activeCodesList.length})
+                </Button>
+                <Button
+                  variant={codeTabFilter === "expired" ? "secondary" : "ghost"}
+                  size="sm"
+                  type="button"
+                  className="h-6 text-[11px] px-2 font-semibold text-amber-600 dark:text-amber-400"
+                  onClick={() => setCodeTabFilter("expired")}
+                >
+                  Expired ({expiredCodesList.length})
+                </Button>
+                <Button
+                  variant={codeTabFilter === "revoked" ? "secondary" : "ghost"}
+                  size="sm"
+                  type="button"
+                  className="h-6 text-[11px] px-2 font-semibold text-red-600 dark:text-red-400"
+                  onClick={() => setCodeTabFilter("revoked")}
+                >
+                  Deactive / Blocked ({revokedCodesList.length})
+                </Button>
+              </div>
+            </div>
+
             {/* List of Created Activation Codes */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-56 overflow-y-auto divide-y">
-                {codes.length === 0 ? (
+              <div className="max-h-64 overflow-y-auto divide-y">
+                {filteredCodes.length === 0 ? (
                   <div className="p-4 text-center text-xs text-muted-foreground">
-                    No activation codes created yet. Fill the form above to generate your first code.
+                    No activation codes found matching filter "{codeTabFilter}".
                   </div>
                 ) : (
-                  codes.map((c) => (
-                    <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
-                      <div className="flex items-center gap-3">
-                        <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
-                          {c.code}
-                        </code>
-                        <div>
-                          <p className="font-semibold text-foreground leading-tight">{c.clientName} <span className="text-[10px] text-emerald-600 font-mono font-bold">(FY {c.financialYear || "2025-26"})</span></p>
-                          <p className="text-[10px] text-muted-foreground">
-                            Created: {new Date(c.createdAt).toLocaleDateString()}
-                            {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
-                            {c.usedByMobile && ` • Mobile: ${c.usedByMobile}`}
-                          </p>
-                        </div>
-                      </div>
+                  filteredCodes.map((c) => {
+                    const expired = isCodeExpired(c);
+                    const isDeactive = c.status === "revoked";
+                    const formattedExpiry = c.validUntil
+                      ? new Date(c.validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                      : "31/03/2027";
 
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                            c.status === "active"
-                              ? "bg-emerald-500/15 text-emerald-600"
-                              : c.status === "redeemed"
-                              ? "bg-blue-500/15 text-blue-600"
-                              : "bg-red-500/15 text-red-600"
-                          }`}
-                        >
-                          {c.status === "revoked" ? "Deactivated" : c.status}
-                        </span>
+                    return (
+                      <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
+                        <div className="flex items-center gap-3">
+                          <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
+                            {c.code}
+                          </code>
+                          <div>
+                            <p className="font-semibold text-foreground leading-tight flex items-center gap-2">
+                              <span>{c.clientName}</span>
+                              <span className="text-[10px] text-emerald-600 font-mono font-bold">(FY {c.financialYear || "2026-27"})</span>
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Created: {new Date(c.createdAt).toLocaleDateString("en-IN")} • <span className="font-semibold text-foreground">Expiry Date: {formattedExpiry}</span>
+                              {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
+                              {c.usedByMobile && ` • Mobile: ${c.usedByMobile}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${
+                              isDeactive
+                                ? "bg-red-500/15 text-red-600 border-red-500/30"
+                                : expired
+                                ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                                : c.status === "redeemed"
+                                ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                                : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                            }`}
+                          >
+                            {isDeactive ? "Deactivated" : expired ? "Expired" : c.status}
+                          </span>
 
                         <Button
                           variant="ghost"
