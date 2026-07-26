@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ShieldCheck, Key, ArrowLeft, Save,
   Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power, Phone, CalendarCheck
@@ -646,139 +647,121 @@ export function AdminPage() {
               </div>
             </form>
 
-            {/* Code Filter Tabs: Active, Expired, Deactive / Blocked */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 pb-1 border-t">
-              <span className="text-xs font-bold text-foreground">Activation Codes Directory</span>
-              <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg border">
-                <Button
-                  variant={codeTabFilter === "all" ? "secondary" : "ghost"}
-                  size="sm"
-                  type="button"
-                  className="h-6 text-[11px] px-2 font-semibold"
-                  onClick={() => setCodeTabFilter("all")}
-                >
-                  All ({codes.length})
-                </Button>
-                <Button
-                  variant={codeTabFilter === "active" ? "secondary" : "ghost"}
-                  size="sm"
-                  type="button"
-                  className="h-6 text-[11px] px-2 font-semibold text-emerald-600 dark:text-emerald-400"
-                  onClick={() => setCodeTabFilter("active")}
-                >
-                  Active ({activeCodesList.length})
-                </Button>
-                <Button
-                  variant={codeTabFilter === "expired" ? "secondary" : "ghost"}
-                  size="sm"
-                  type="button"
-                  className="h-6 text-[11px] px-2 font-semibold text-amber-600 dark:text-amber-400"
-                  onClick={() => setCodeTabFilter("expired")}
-                >
-                  Expired ({expiredCodesList.length})
-                </Button>
-                <Button
-                  variant={codeTabFilter === "revoked" ? "secondary" : "ghost"}
-                  size="sm"
-                  type="button"
-                  className="h-6 text-[11px] px-2 font-semibold text-red-600 dark:text-red-400"
-                  onClick={() => setCodeTabFilter("revoked")}
-                >
-                  Deactive / Blocked ({revokedCodesList.length})
-                </Button>
+            {/* Activation Code Directory Sub-Tabs */}
+            <Tabs defaultValue="active" value={codeTabFilter} onValueChange={(v) => setCodeTabFilter(v as any)} className="w-full pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5 text-primary" /> Activation Codes Sub-Directory
+                </span>
+                <TabsList className="h-8 p-1 bg-muted/60">
+                  <TabsTrigger value="active" className="text-xs px-2.5 h-6 font-semibold data-[state=active]:text-emerald-600">
+                    Active ({activeCodesList.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="expired" className="text-xs px-2.5 h-6 font-semibold data-[state=active]:text-amber-600">
+                    Expired ({expiredCodesList.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="revoked" className="text-xs px-2.5 h-6 font-semibold data-[state=active]:text-red-600">
+                    Deactive / Blocked ({revokedCodesList.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="text-xs px-2.5 h-6 font-semibold">
+                    All ({codes.length})
+                  </TabsTrigger>
+                </TabsList>
               </div>
-            </div>
 
-            {/* List of Created Activation Codes */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-64 overflow-y-auto divide-y">
-                {filteredCodes.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-muted-foreground">
-                    No activation codes found matching filter "{codeTabFilter}".
-                  </div>
-                ) : (
-                  filteredCodes.map((c) => {
-                    const expired = isCodeExpired(c);
-                    const isDeactive = c.status === "revoked";
-                    const formattedExpiry = c.validUntil
-                      ? new Date(c.validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
-                      : "31/03/2027";
-
-                    return (
-                      <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
-                        <div className="flex items-center gap-3">
-                          <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
-                            {c.code}
-                          </code>
-                          <div>
-                            <p className="font-semibold text-foreground leading-tight flex items-center gap-2">
-                              <span>{c.clientName}</span>
-                              <span className="text-[10px] text-emerald-600 font-mono font-bold">(FY {c.financialYear || "2026-27"})</span>
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Created: {new Date(c.createdAt).toLocaleDateString("en-IN")} • <span className="font-semibold text-foreground">Expiry Date: {formattedExpiry}</span>
-                              {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
-                              {c.usedByMobile && ` • Mobile: ${c.usedByMobile}`}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${
-                              isDeactive
-                                ? "bg-red-500/15 text-red-600 border-red-500/30"
-                                : expired
-                                ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
-                                : c.status === "redeemed"
-                                ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
-                                : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                            }`}
-                          >
-                            {isDeactive ? "Deactivated" : expired ? "Expired" : c.status}
-                          </span>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleCopy(c.code, c.id)}
-                          title="Copy Code"
-                        >
-                          {copiedId === c.id ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </Button>
-
-                        {/* Activate / Deactivate Toggle Button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={`h-7 w-7 ${c.status === "revoked" ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-600 hover:bg-amber-50"}`}
-                          onClick={() => handleToggleCodeStatus(c.id, c.status)}
-                          title={c.status === "revoked" ? "Activate Code" : "Deactivate Code"}
-                        >
-                          <Power className="h-3.5 w-3.5" />
-                        </Button>
-
-                        {/* Delete Code Button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDeleteCode(c.id, c.code)}
-                          title="Delete Code Permanently"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+              <TabsContent value={codeTabFilter} className="mt-3">
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto divide-y">
+                    {filteredCodes.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        No activation codes found in "{codeTabFilter}" sub-tab.
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+                    ) : (
+                      filteredCodes.map((c) => {
+                        const expired = isCodeExpired(c);
+                        const isDeactive = c.status === "revoked";
+                        const formattedExpiry = c.validUntil
+                          ? new Date(c.validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                          : "31/03/2027";
+
+                        return (
+                          <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-muted/20 text-xs">
+                            <div className="flex items-center gap-3">
+                              <code className="font-bold text-xs bg-muted px-2 py-1 rounded font-mono text-primary border">
+                                {c.code}
+                              </code>
+                              <div>
+                                <p className="font-semibold text-foreground leading-tight flex items-center gap-2">
+                                  <span>{c.clientName}</span>
+                                  <span className="text-[10px] text-emerald-600 font-mono font-bold">(FY {c.financialYear || "2026-27"})</span>
+                                </p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                  Created: {new Date(c.createdAt).toLocaleDateString("en-IN")} • <span className="font-semibold text-foreground">Expiry Date: {formattedExpiry}</span>
+                                  {c.usedByEmail && ` • Locked to: ${c.usedByEmail}`}
+                                  {c.usedByMobile && ` • Mobile: ${c.usedByMobile}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${
+                                  isDeactive
+                                    ? "bg-red-500/15 text-red-600 border-red-500/30"
+                                    : expired
+                                    ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                                    : c.status === "redeemed"
+                                    ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                                    : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                                }`}
+                              >
+                                {isDeactive ? "Deactivated" : expired ? "Expired" : c.status}
+                              </span>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleCopy(c.code, c.id)}
+                                title="Copy Code"
+                              >
+                                {copiedId === c.id ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+
+                              {/* Activate / Deactivate Toggle Button */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-7 w-7 ${isDeactive ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-600 hover:bg-amber-50"}`}
+                                onClick={() => handleToggleCodeStatus(c.id, c.status)}
+                                title={isDeactive ? "Activate Code" : "Deactivate Code"}
+                              >
+                                <Power className="h-3.5 w-3.5" />
+                              </Button>
+
+                              {/* Delete Code Button */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteCode(c.id, c.code)}
+                                title="Delete Code Permanently"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
