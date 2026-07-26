@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ShieldCheck, CalendarCheck, RotateCw, Phone } from "lucide-react";
+import { ShieldCheck, CalendarCheck, RotateCw, Phone, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createRenewalRequest } from "@/lib/firebase";
+import { createRenewalRequest, getNextFinancialYear } from "@/lib/firebase";
+import { isLicenseInLastMonthOrExpired } from "@/lib/rule43";
 
 interface Props {
   open: boolean;
@@ -22,7 +23,9 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
 
   const activeCode = typeof window !== "undefined" ? localStorage.getItem("r43_activated_code") : null;
   const userMobile = typeof window !== "undefined" ? localStorage.getItem("r43_user_mobile") : null;
-  const userFY = typeof window !== "undefined" ? localStorage.getItem("r43_code_fy") : "2025-26";
+  const userFY = (typeof window !== "undefined" ? localStorage.getItem("r43_code_fy") : null) || "2026-27";
+  const nextFY = getNextFinancialYear(userFY);
+  const isRenewalPeriod = isLicenseInLastMonthOrExpired(userFY);
 
   const handleRequestRenewal = async () => {
     const email = user?.email || localStorage.getItem("r43_user_email") || "";
@@ -39,15 +42,15 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
       userName: user?.name || email.split("@")[0],
       userMobile: mobile || "N/A",
       currentCode: activeCode || "N/A",
-      currentFY: userFY || "2025-26",
-      requestedFY: "2026-27",
+      currentFY: userFY,
+      requestedFY: nextFY,
     });
     setRequesting(false);
 
     if (ok) {
       toast({
         title: "Renewal Request Submitted!",
-        description: "Your license renewal request for FY 2026-27 has been sent to Administrator.",
+        description: `Your license renewal request for FY ${nextFY} has been sent to Administrator.`,
       });
     } else {
       toast({ title: "Failed to submit request", description: "Please try again.", variant: "destructive" });
@@ -95,32 +98,38 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
           </div>
 
           {/* License Validity Badge Card */}
-          <div className="p-3 bg-muted/40 rounded-lg border space-y-2">
+          <div className="p-3.5 bg-muted/40 rounded-lg border space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold flex items-center gap-1.5">
                 <CalendarCheck className="h-4 w-4 text-emerald-500" /> License Validity
               </span>
-              <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-600 px-2 py-0.5 rounded border border-emerald-500/30">
+              <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                 Active (FY {userFY})
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Activation Code: <code className="font-mono text-foreground font-semibold">{activeCode || "Trial Mode"}</code>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Activation Code: <code className="font-mono text-foreground font-semibold bg-muted px-1.5 py-0.5 rounded border">{activeCode || "Trial Mode"}</code>
               <br />
-              Valid until: <span className="font-semibold text-foreground">March 31, {userFY ? `20${userFY.split("-")[1]}` : "2026"}</span>
+              Valid until: <span className="font-semibold text-foreground">March 31, 20{userFY.split("-")[1] || "27"}</span>
             </p>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={requesting}
-              onClick={handleRequestRenewal}
-              className="w-full text-xs h-8 font-semibold gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${requesting ? "animate-spin" : ""}`} />
-              Request FY 2026-27 Renewal
-            </Button>
+            {isRenewalPeriod ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={requesting}
+                onClick={handleRequestRenewal}
+                className="w-full text-xs h-8 font-semibold gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+              >
+                <RotateCw className={`h-3.5 w-3.5 ${requesting ? "animate-spin" : ""}`} />
+                Request FY {nextFY} Renewal
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold pt-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> License Active (Renewal opens in March)
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

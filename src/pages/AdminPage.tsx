@@ -47,7 +47,7 @@ export function AdminPage() {
   // Code Generation State
   const [newClientName, setNewClientName] = useState("");
   const [customCodeInput, setCustomCodeInput] = useState("");
-  const [selectedFY, setSelectedFY] = useState("2025-26");
+  const [customExpiryInput, setCustomExpiryInput] = useState("");
   const [creatingCode, setCreatingCode] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -159,16 +159,17 @@ export function AdminPage() {
     const finalCode = customCodeInput.trim() || generateRandomCode();
     setCreatingCode(true);
 
-    const created = await createActivationCode(finalCode, newClientName);
+    const created = await createActivationCode(finalCode, newClientName, customExpiryInput || undefined);
     setCreatingCode(false);
 
     if (created) {
       setCodes((prev) => [created, ...prev]);
       setNewClientName("");
       setCustomCodeInput("");
+      setCustomExpiryInput("");
       toast({
         title: "Activation Code Created!",
-        description: `Code ${created.code} for FY ${created.financialYear} is live (Expires March 31).`,
+        description: `Code ${created.code} for FY ${created.financialYear} is live (Expires ${new Date(created.validUntil).toLocaleDateString("en-IN")}).`,
       });
     } else {
       toast({
@@ -588,7 +589,7 @@ export function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
+            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3.5 bg-muted/30 rounded-lg border">
               <div>
                 <Label className="text-[11px] font-semibold">Client Name / Label</Label>
                 <Input
@@ -597,6 +598,16 @@ export function AdminPage() {
                   onChange={(e) => setNewClientName(e.target.value)}
                   className="text-xs h-8 bg-background mt-1"
                   required
+                />
+              </div>
+
+              <div>
+                <Label className="text-[11px] font-semibold">Custom Expiry Date (Optional)</Label>
+                <Input
+                  type="date"
+                  value={customExpiryInput}
+                  onChange={(e) => setCustomExpiryInput(e.target.value)}
+                  className="text-xs h-8 bg-background mt-1 font-mono"
                 />
               </div>
 

@@ -13,8 +13,8 @@ export interface ActivationCode {
   clientName: string;
   status: "active" | "redeemed" | "revoked" | "expired";
   createdAt: string;
-  financialYear: string; // e.g. "2025-26"
-  validUntil: string;    // ISO Date string e.g. "2026-03-31T23:59:59.000Z"
+  financialYear: string; // e.g. "2026-27"
+  validUntil: string;    // ISO Date string e.g. "2027-03-31T23:59:59.000Z"
   usedByEmail?: string;
   usedByMobile?: string;
   usedAt?: string;
@@ -84,6 +84,20 @@ export function getCurrentFinancialYear(date: Date = new Date()): string {
     const currYr = year % 100;
     return `${prevYr}-${currYr < 10 ? '0' + currYr : currYr}`;
   }
+}
+
+/** Calculate next Financial Year e.g. "2026-27" -> "2027-28" */
+export function getNextFinancialYear(currentFY: string = "2026-27"): string {
+  const parts = currentFY.split("-");
+  if (parts.length === 2) {
+    const startYr = parseInt(parts[0], 10);
+    if (!isNaN(startYr)) {
+      const nextStart = startYr + 1;
+      const nextEnd = (nextStart + 1) % 100;
+      return `${nextStart}-${nextEnd < 10 ? '0' + nextEnd : nextEnd}`;
+    }
+  }
+  return "2027-28";
 }
 
 /** Helper to calculate FY end date (March 31st of second year) */
@@ -156,16 +170,20 @@ export async function getActivationCodes(): Promise<ActivationCode[]> {
   return [];
 }
 
-/** Create a new Activation Code with Automatic Financial Year validity */
+/** Create a new Activation Code with Automatic or Custom Expiry Date */
 export async function createActivationCode(
   code: string,
   clientName: string,
+  customExpiryDate?: string,
   customFY?: string
 ): Promise<ActivationCode | null> {
   try {
     const id = `code_${Date.now()}`;
     const financialYear = customFY ? customFY.trim() : getCurrentFinancialYear();
-    const validUntil = calculateFYEndDate(financialYear);
+    const validUntil = customExpiryDate
+      ? new Date(`${customExpiryDate}T23:59:59.000Z`).toISOString()
+      : calculateFYEndDate(financialYear);
+
     const record: ActivationCode = {
       id,
       code: code.toUpperCase().trim(),
@@ -260,14 +278,14 @@ export async function verifyActivationCode(
       };
     }
 
-    // Check Financial Year Expiry
+    // Check Expiry Date
     if (match.validUntil) {
       const expiryDate = new Date(match.validUntil);
       if (new Date() > expiryDate) {
         return {
           valid: false,
           doc: match,
-          message: `License Expired: Your code for FY ${match.financialYear || "2025-26"} expired on March 31. Please submit a renewal request to continue.`,
+          message: `License Expired: Your code for FY ${match.financialYear || "2026-27"} expired on ${expiryDate.toLocaleDateString("en-IN")}. Please submit a renewal request to continue.`,
         };
       }
     }
@@ -288,15 +306,52 @@ export async function verifyActivationCode(
   }
 }
 
-/** Get all Registered Users */
+/** Get all Registered Users combining users collection & redeemed activation codes */
 export async function getRegisteredUsers(): Promise<UserRecord[]> {
   try {
-    const res = await fetch(`${FIRESTORE_BASE_URL}/users`);
-    if (res.ok) {
-      const data = await res.json();
-      const docs = data.documents || [];
-      return docs.map(parseFirestoreDoc);
+    const [usersRes, codesRes] = await Promise.all([
+      fetch(`${FIRESTORE_BASE_URL}/users`),
+      fetch(`${FIRESTORE_BASE_URL}/activation_codes`),
+    ]);
+
+    let userList: UserRecord[] = [];
+    if (usersRes.ok) {
+      const data = await usersRes.json();
+      userList = (data.documents || []).map(parseFirestoreDoc);
     }
+
+    let codeList: ActivationCode[] = [];
+    if (codesRes.ok) {
+      const data = await codesRes.json();
+      codeList = (data.documents || []).map(parseFirestoreDoc);
+    }
+
+    // Merge redeemed activation code users into userList if not present
+    for (const code of codeList) {
+      if (code.usedByEmail || code.usedByMobile) {
+        const emailKey = (code.usedByEmail || "").toLowerCase().trim();
+        const existing = userList.find(u => u.email.toLowerCase() === emailKey || (code.usedByMobile && u.mobile === code.usedByMobile));
+        if (existing) {
+          if (!existing.codeUsed) existing.codeUsed = code.code;
+          if (!existing.mobile && code.usedByMobile) existing.mobile = code.usedByMobile;
+          if (!existing.financialYear) existing.financialYear = code.financialYear;
+        } else {
+          userList.push({
+            id: `merged_${code.id}`,
+            email: code.usedByEmail || `${code.usedByMobile}@client.local`,
+            name: code.clientName || "Client User",
+            mobile: code.usedByMobile || "",
+            firstLogin: code.usedAt || code.createdAt || new Date().toISOString(),
+            lastLogin: code.usedAt || new Date().toISOString(),
+            codeUsed: code.code,
+            financialYear: code.financialYear || "2026-27",
+            status: code.status === "revoked" ? "blocked" : "active",
+          });
+        }
+      }
+    }
+
+    return userList;
   } catch (e) {
     console.error("Failed to fetch registered users:", e);
   }

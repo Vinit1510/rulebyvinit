@@ -79,6 +79,20 @@ export function isMonthWithinLicensedFY(monthKey: string, fy: string = getActive
   return d <= maxDate;
 }
 
+/** Check if license is in its final month (March) or already expired */
+export function isLicenseInLastMonthOrExpired(fy: string = getActiveLicenseFY()): boolean {
+  const now = new Date();
+  const maxDate = getMaxLicensedDate(fy);
+  
+  if (now > maxDate) return true;
+
+  // 30 days before March 31st (starting March 1st)
+  const thirtyDaysBefore = new Date(maxDate);
+  thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
+
+  return now >= thirtyDaysBefore;
+}
+
 export interface Invoice extends GstComponents {
   id: string;
   invoiceNo: string;
