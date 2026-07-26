@@ -81,10 +81,16 @@ export function UserMenu() {
               <span className="text-xs font-semibold">Offline</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 border border-border shadow-md">
+          <DropdownMenuContent align="end" className="w-56 border border-border shadow-md">
             <DropdownMenuLabel className="font-normal text-xs text-muted-foreground pb-1">
-              Local browser sandbox
+              Local Browser Sandbox
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem onClick={() => setProfileOpen(true)} className="text-xs font-medium cursor-pointer py-2">
+              <UserIcon className="h-3.5 w-3.5 mr-2 text-muted-foreground" /> Account &amp; License Details
+            </DropdownMenuItem>
+
             <DropdownMenuSeparator />
             
             <DropdownMenuItem onClick={handleExportBackup} className="text-xs cursor-pointer py-2">
@@ -101,6 +107,7 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       </>
     );
   }

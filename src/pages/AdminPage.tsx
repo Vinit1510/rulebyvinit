@@ -159,7 +159,7 @@ export function AdminPage() {
     const finalCode = customCodeInput.trim() || generateRandomCode();
     setCreatingCode(true);
 
-    const created = await createActivationCode(finalCode, newClientName, selectedFY);
+    const created = await createActivationCode(finalCode, newClientName);
     setCreatingCode(false);
 
     if (created) {
@@ -168,7 +168,7 @@ export function AdminPage() {
       setCustomCodeInput("");
       toast({
         title: "Activation Code Created!",
-        description: `Code ${created.code} for FY ${selectedFY} is live.`,
+        description: `Code ${created.code} for FY ${created.financialYear} is live (Expires March 31).`,
       });
     } else {
       toast({
@@ -584,11 +584,11 @@ export function AdminPage() {
               </span>
             </div>
             <CardDescription className="text-xs">
-              Codes automatically lock to the first Gmail address and expire on March 31st of selected FY.
+              Codes automatically lock to the first Gmail address and auto-calculate Financial Year validity (April to March) based on generation date.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3.5 bg-muted/30 rounded-lg border">
+            <form onSubmit={handleCreateCode} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/30 rounded-lg border">
               <div>
                 <Label className="text-[11px] font-semibold">Client Name / Label</Label>
                 <Input
@@ -601,23 +601,9 @@ export function AdminPage() {
               </div>
 
               <div>
-                <Label className="text-[11px] font-semibold">Financial Year Validity</Label>
-                <Select value={selectedFY} onValueChange={setSelectedFY}>
-                  <SelectTrigger className="h-8 text-xs bg-background mt-1">
-                    <SelectValue placeholder="Select FY" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025-26">FY 2025-26 (Exp. March 2026)</SelectItem>
-                    <SelectItem value="2026-27">FY 2026-27 (Exp. March 2027)</SelectItem>
-                    <SelectItem value="2027-28">FY 2027-28 (Exp. March 2028)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <Label className="text-[11px] font-semibold">Custom Code (Optional)</Label>
                 <Input
-                  placeholder="Blank for auto"
+                  placeholder="Blank for auto-generate"
                   value={customCodeInput}
                   onChange={(e) => setCustomCodeInput(e.target.value)}
                   className="text-xs h-8 bg-background mt-1 uppercase font-mono"

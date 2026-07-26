@@ -71,9 +71,23 @@ function formatFirestoreFields(data: Record<string, any>): Record<string, any> {
   return fields;
 }
 
+/** Auto-calculate current Indian Financial Year based on creation date */
+export function getCurrentFinancialYear(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // 1-indexed (1=Jan, 4=Apr, 12=Dec)
+  
+  if (month >= 4) {
+    const nextYr = (year + 1) % 100;
+    return `${year}-${nextYr < 10 ? '0' + nextYr : nextYr}`;
+  } else {
+    const prevYr = year - 1;
+    const currYr = year % 100;
+    return `${prevYr}-${currYr < 10 ? '0' + currYr : currYr}`;
+  }
+}
+
 /** Helper to calculate FY end date (March 31st of second year) */
 export function calculateFYEndDate(financialYear: string): string {
-  // financialYear format: "2025-26" -> end year 2026
   const parts = financialYear.split("-");
   let endYear = new Date().getFullYear();
   if (parts.length === 2) {
@@ -142,21 +156,22 @@ export async function getActivationCodes(): Promise<ActivationCode[]> {
   return [];
 }
 
-/** Create a new Activation Code with Financial Year validity */
+/** Create a new Activation Code with Automatic Financial Year validity */
 export async function createActivationCode(
   code: string,
   clientName: string,
-  financialYear: string = "2025-26"
+  customFY?: string
 ): Promise<ActivationCode | null> {
   try {
     const id = `code_${Date.now()}`;
+    const financialYear = customFY ? customFY.trim() : getCurrentFinancialYear();
     const validUntil = calculateFYEndDate(financialYear);
     const record: ActivationCode = {
       id,
       code: code.toUpperCase().trim(),
       clientName: clientName.trim() || "General Client",
       status: "active",
-      financialYear: financialYear.trim(),
+      financialYear,
       validUntil,
       createdAt: new Date().toISOString(),
     };
