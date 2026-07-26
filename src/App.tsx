@@ -386,6 +386,7 @@ function ProtectedRoute() {
         if (settings.activationRequired) {
           if (!storedCode) {
             if (active) {
+              secureStorage.removeItem("r43_working_offline");
               setIsActivated(false);
               setCheckingActivation(false);
               setLocation("/sign-in");
@@ -394,9 +395,12 @@ function ProtectedRoute() {
           }
 
           if (navigator.onLine) {
-            const check = await verifyActivationCode(storedCode, user?.email);
+            const storedEmail = secureStorage.getItem("r43_user_email") || user?.email;
+            const check = await verifyActivationCode(storedCode, storedEmail || undefined);
             if (!check.valid) {
               if (active) {
+                secureStorage.removeItem("r43_activated_code");
+                secureStorage.removeItem("r43_working_offline");
                 setIsActivated(false);
                 setCheckingActivation(false);
                 setLocation("/sign-in");
