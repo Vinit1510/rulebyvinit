@@ -7,7 +7,7 @@ import {
   Calculator, BookOpen, Layers,
   ArrowRight, ShieldCheck, AlertTriangle, RotateCw
 } from "lucide-react";
-import { isLicenseInLastMonthOrExpired, getActiveLicenseFY } from "@/lib/rule43";
+import { isLicenseInLastMonthOrExpired, getActiveLicenseFY, getMaxLicensedDate } from "@/lib/rule43";
 import { getNextFinancialYear, createRenewalRequest } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { secureStorage } from "@/lib/secureStorage";
@@ -23,6 +23,7 @@ export function DashboardView({ onNavigate }: Props) {
   const userFY = getActiveLicenseFY();
   const nextFY = getNextFinancialYear(userFY);
   const showBanner = isLicenseInLastMonthOrExpired(userFY);
+  const expiryStr = getMaxLicensedDate(userFY).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" });
 
   const handleRequestRenewal = async () => {
     const email = secureStorage.getItem("r43_user_email") || "";
@@ -93,7 +94,7 @@ export function DashboardView({ onNavigate }: Props) {
         <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-semibold">
             <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-            <span>Notice: Your license for FY {userFY} expires on March 31. Please submit your FY {nextFY} renewal request to continue uninterrupted.</span>
+            <span>Notice: Your license expires on {expiryStr}. Please submit your FY {nextFY} renewal request to continue uninterrupted.</span>
           </div>
           <Button
             size="sm"

@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ShieldCheck, CalendarCheck, RotateCw, Phone, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createRenewalRequest, getNextFinancialYear } from "@/lib/firebase";
-import { isLicenseInLastMonthOrExpired } from "@/lib/rule43";
+import { isLicenseInLastMonthOrExpired, getMaxLicensedDate } from "@/lib/rule43";
 import { secureStorage } from "@/lib/secureStorage";
 
 interface Props {
@@ -27,6 +27,7 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
   const userFY = (typeof window !== "undefined" ? secureStorage.getItem("r43_code_fy") : null) || "2026-27";
   const nextFY = getNextFinancialYear(userFY);
   const isRenewalPeriod = isLicenseInLastMonthOrExpired(userFY);
+  const expiryStr = getMaxLicensedDate(userFY).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" });
 
   const handleRequestRenewal = async () => {
     const email = user?.email || secureStorage.getItem("r43_user_email") || "";
@@ -111,7 +112,7 @@ export function ProfileDialog({ open, onOpenChange }: Props) {
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               Activation Code: <code className="font-mono text-foreground font-semibold bg-muted px-1.5 py-0.5 rounded border">{activeCode || "Trial Mode"}</code>
               <br />
-              Valid until: <span className="font-semibold text-foreground">March 31, 20{userFY.split("-")[1] || "27"}</span>
+              Valid until: <span className="font-semibold text-foreground">{expiryStr}</span>
             </p>
 
             {isRenewalPeriod ? (

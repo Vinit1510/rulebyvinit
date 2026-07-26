@@ -49,10 +49,17 @@ export function getActiveLicenseFY(): string {
   return "2026-27";
 }
 
-/** Get maximum allowed invoice/turnover date based on license FY (e.g. 2026-03-31 for FY 2025-26) */
+/** Get maximum allowed invoice/turnover date based on license expiry date or FY */
 export function getMaxLicensedDate(fy: string = getActiveLicenseFY()): Date {
+  if (typeof window !== "undefined") {
+    const customValidUntil = secureStorage.getItem("r43_valid_until");
+    if (customValidUntil) {
+      const parsed = new Date(customValidUntil);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+  }
   const parts = fy.split("-");
-  let endYear = 2026;
+  let endYear = 2027;
   if (parts.length === 2) {
     const startYr = parseInt(parts[0], 10);
     const endYrPart = parseInt(parts[1], 10);
@@ -81,15 +88,15 @@ export function isMonthWithinLicensedFY(monthKey: string, fy: string = getActive
   return d <= maxDate;
 }
 
-/** Check if license is in its final month (March) or already expired */
+/** Check if license is within 30 days of expiry date or already expired */
 export function isLicenseInLastMonthOrExpired(fy: string = getActiveLicenseFY()): boolean {
   const now = new Date();
   const maxDate = getMaxLicensedDate(fy);
   
   if (now > maxDate) return true;
 
-  // 30 days before March 31st (starting March 1st)
-  const thirtyDaysBefore = new Date(maxDate);
+  // 30 days before expiry date
+  const thirtyDaysBefore = new Date(maxDate.getTime());
   thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
 
   return now >= thirtyDaysBefore;

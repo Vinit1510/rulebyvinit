@@ -118,6 +118,7 @@ export function AuthPage() {
         secureStorage.setItem("r43_user_email", finalEmail);
         secureStorage.setItem("r43_user_mobile", finalMobile);
         secureStorage.setItem("r43_code_fy", res.doc.financialYear || "2026-27");
+        if (res.doc.validUntil) secureStorage.setItem("r43_valid_until", res.doc.validUntil);
         secureStorage.setItem("r43_working_offline", "true");
       }
       await updateCodeStatus(res.doc.id, "redeemed", finalEmail, finalMobile);
