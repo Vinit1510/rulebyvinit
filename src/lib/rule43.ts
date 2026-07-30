@@ -6,6 +6,9 @@ export interface GstComponents {
   igstRate: number;
   cgstRate: number;
   sgstRate: number;
+  igstAmount?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
 }
 
 export interface CreditNote extends GstComponents {
@@ -163,6 +166,9 @@ export interface Rule43Result {
   netCgstItc: number;
   netSgstItc: number;
   monthlyItc: number;
+  tmIgst: number;
+  tmCgst: number;
+  tmSgst: number;
   rows: MonthRow[];
   totalReversal: number;
   totalRetained: number;
@@ -179,19 +185,32 @@ export interface Rule43Result {
 
 export const USEFUL_LIFE_MONTHS = 60;
 
-/** Total GST rate = IGST + CGST + SGST */
-export function totalGstRate(x: GstComponents): number {
-  return (Number(x.igstRate) || 0) + (Number(x.cgstRate) || 0) + (Number(x.sgstRate) || 0);
+/** Total GST rate = IGST + CGST + SGST or computed from amounts */
+export function totalGstRate(x: GstComponents, taxableValue: number = 0): number {
+  const rateSum = (Number(x.igstRate) || 0) + (Number(x.cgstRate) || 0) + (Number(x.sgstRate) || 0);
+  if (rateSum > 0) return rateSum;
+  const tv = Number(taxableValue) || 0;
+  const amtSum = (Number(x.igstAmount) || 0) + (Number(x.cgstAmount) || 0) + (Number(x.sgstAmount) || 0);
+  if (tv > 0 && amtSum > 0) {
+    return (amtSum / tv) * 100;
+  }
+  return 0;
 }
 
-/** Compute IGST, CGST, SGST ITC amounts from a taxable value + components */
+/** Compute IGST, CGST, SGST ITC amounts from a taxable value + components (prioritizes explicit Rupee Amounts) */
 export function computeItcComponents(taxableValue: number, g: GstComponents) {
   const tv = Number(taxableValue) || 0;
-  return {
-    igstItc: tv * (Number(g.igstRate) || 0) / 100,
-    cgstItc: tv * (Number(g.cgstRate) || 0) / 100,
-    sgstItc: tv * (Number(g.sgstRate) || 0) / 100,
-  };
+  const igstItc = (g.igstAmount !== undefined && g.igstAmount !== null && !isNaN(Number(g.igstAmount)) && Number(g.igstAmount) > 0)
+    ? Number(g.igstAmount)
+    : (tv * (Number(g.igstRate) || 0)) / 100;
+  const cgstItc = (g.cgstAmount !== undefined && g.cgstAmount !== null && !isNaN(Number(g.cgstAmount)) && Number(g.cgstAmount) > 0)
+    ? Number(g.cgstAmount)
+    : (tv * (Number(g.cgstRate) || 0)) / 100;
+  const sgstItc = (g.sgstAmount !== undefined && g.sgstAmount !== null && !isNaN(Number(g.sgstAmount)) && Number(g.sgstAmount) > 0)
+    ? Number(g.sgstAmount)
+    : (tv * (Number(g.sgstRate) || 0)) / 100;
+
+  return { igstItc, cgstItc, sgstItc };
 }
 
 export function formatINR(n: number): string {
@@ -366,7 +385,11 @@ export function computeInvoice(
     totalItc: grossTotalItc,
     igstItc: grossIgstItc, cgstItc: grossCgstItc, sgstItc: grossSgstItc,
     netTotalItc, netIgstItc, netCgstItc, netSgstItc,
-    monthlyItc: baseTm, rows: [],
+    monthlyItc: baseTm,
+    tmIgst: netIgstItc / USEFUL_LIFE_MONTHS,
+    tmCgst: netCgstItc / USEFUL_LIFE_MONTHS,
+    tmSgst: netSgstItc / USEFUL_LIFE_MONTHS,
+    rows: [],
     totalReversal, totalRetained,
     igstReversal: totalReversal * (grossTotalItc > 0 ? grossIgstItc / grossTotalItc : 0),
     cgstReversal: totalReversal * (grossTotalItc > 0 ? grossCgstItc / grossTotalItc : 0),
@@ -582,7 +605,11 @@ export function computeInvoice(
     totalItc: grossTotalItc,
     igstItc: grossIgstItc, cgstItc: grossCgstItc, sgstItc: grossSgstItc,
     netTotalItc, netIgstItc, netCgstItc, netSgstItc,
-    monthlyItc: baseTm, rows,
+    monthlyItc: baseTm,
+    tmIgst: netIgstItc / USEFUL_LIFE_MONTHS,
+    tmCgst: netCgstItc / USEFUL_LIFE_MONTHS,
+    tmSgst: netSgstItc / USEFUL_LIFE_MONTHS,
+    rows,
     totalReversal: cumulativeReversal, totalRetained: cumulativeRetained,
     igstReversal: cumIgstReversal, cgstReversal: cumCgstReversal, sgstReversal: cumSgstReversal,
     remainingUnamortized, status, monthsElapsed, remainingMonths,

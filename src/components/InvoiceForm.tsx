@@ -48,49 +48,88 @@ function GstRateFields({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => switchSupply("interstate")}
-          className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${supplyType === "interstate" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted/50"}`}
-        >
-          Interstate (IGST)
-        </button>
-        <button
-          type="button"
-          onClick={() => switchSupply("intrastate")}
-          className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${supplyType === "intrastate" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted/50"}`}
-        >
-          Intrastate (CGST + SGST)
-        </button>
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-semibold">Tax Supply Type &amp; Tax Calculation</Label>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => switchSupply("interstate")}
+            className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${supplyType === "interstate" ? "bg-primary text-primary-foreground border-primary font-medium" : "border-border hover:bg-muted/50 text-muted-foreground"}`}
+          >
+            Interstate (IGST)
+          </button>
+          <button
+            type="button"
+            onClick={() => switchSupply("intrastate")}
+            className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${supplyType === "intrastate" ? "bg-primary text-primary-foreground border-primary font-medium" : "border-border hover:bg-muted/50 text-muted-foreground"}`}
+          >
+            Intrastate (CGST + SGST)
+          </button>
+        </div>
       </div>
+
       {supplyType === "interstate" ? (
-        <div className="grid grid-cols-1">
-          <Field label="IGST rate (%) *">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="IGST Rate (%)">
             <Input
-              type="number" min={0} max={100} step={0.1} className="num"
+              type="number" min={0} max={100} step={0.1} className="num text-xs h-8" placeholder="18"
               value={g.igstRate || ""}
-              onChange={(e) => onChange({ igstRate: Number(e.target.value) || 0 })}
+              onChange={(e) => onChange({ igstRate: Number(e.target.value) || 0, igstAmount: undefined })}
+            />
+          </Field>
+          <Field label="IGST Tax Amount (₹)">
+            <Input
+              type="number" min={0} step={1} className="num text-xs h-8" placeholder="Exact ₹ Amount"
+              value={g.igstAmount !== undefined && g.igstAmount !== null ? g.igstAmount : ""}
+              onChange={(e) => {
+                const val = e.target.value === "" ? undefined : Number(e.target.value);
+                onChange({ igstAmount: val });
+              }}
             />
           </Field>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <Field label="CGST rate (%) *">
-            <Input
-              type="number" min={0} max={100} step={0.1} className="num"
-              value={g.cgstRate || ""}
-              onChange={(e) => onChange({ cgstRate: Number(e.target.value) || 0 })}
-            />
-          </Field>
-          <Field label="SGST/UTGST rate (%) *">
-            <Input
-              type="number" min={0} max={100} step={0.1} className="num"
-              value={g.sgstRate || ""}
-              onChange={(e) => onChange({ sgstRate: Number(e.target.value) || 0 })}
-            />
-          </Field>
+          <div className="space-y-2">
+            <Field label="CGST Rate (%)">
+              <Input
+                type="number" min={0} max={100} step={0.1} className="num text-xs h-8" placeholder="9"
+                value={g.cgstRate || ""}
+                onChange={(e) => onChange({ cgstRate: Number(e.target.value) || 0, cgstAmount: undefined })}
+              />
+            </Field>
+            <Field label="CGST Tax Amount (₹)">
+              <Input
+                type="number" min={0} step={1} className="num text-xs h-8" placeholder="Exact ₹ Amount"
+                value={g.cgstAmount !== undefined && g.cgstAmount !== null ? g.cgstAmount : ""}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? undefined : Number(e.target.value);
+                  onChange({ cgstAmount: val });
+                }}
+              />
+            </Field>
+          </div>
+
+          <div className="space-y-2">
+            <Field label="SGST/UTGST Rate (%)">
+              <Input
+                type="number" min={0} max={100} step={0.1} className="num text-xs h-8" placeholder="9"
+                value={g.sgstRate || ""}
+                onChange={(e) => onChange({ sgstRate: Number(e.target.value) || 0, sgstAmount: undefined })}
+              />
+            </Field>
+            <Field label="SGST Tax Amount (₹)">
+              <Input
+                type="number" min={0} step={1} className="num text-xs h-8" placeholder="Exact ₹ Amount"
+                value={g.sgstAmount !== undefined && g.sgstAmount !== null ? g.sgstAmount : ""}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? undefined : Number(e.target.value);
+                  onChange({ sgstAmount: val });
+                }}
+              />
+            </Field>
+          </div>
         </div>
       )}
     </div>

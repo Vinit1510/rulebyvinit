@@ -17,6 +17,8 @@ interface Props {
 
 interface ParsedRow {
   invoiceNo?: string;
+  originalInvoiceNo?: string;
+  docType?: "invoice" | "credit_note" | "debit_note";
   supplier?: string;
   gstin?: string;
   assetName?: string;
@@ -25,6 +27,9 @@ interface ParsedRow {
   igstRate?: number;
   cgstRate?: number;
   sgstRate?: number;
+  igstAmount?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
   gstRate?: number;  // legacy / convenience alias — treated as IGST
   usage?: UsageType;
   nonBusinessUse?: NonBusinessUseType;
@@ -42,6 +47,18 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   "inv#": "invoiceNo",
   "bill no": "invoiceNo",
   "bill number": "invoiceNo",
+  "credit note no": "invoiceNo",
+  "credit note": "invoiceNo",
+  "debit note no": "invoiceNo",
+  "debit note": "invoiceNo",
+  "original invoice no": "originalInvoiceNo",
+  "original invoice": "originalInvoiceNo",
+  "parent invoice no": "originalInvoiceNo",
+  "against invoice no": "originalInvoiceNo",
+  "against invoice": "originalInvoiceNo",
+  "doc type": "docType",
+  "document type": "docType",
+  "note type": "docType",
   supplier: "supplier",
   "supplier name": "supplier",
   "supplier party": "supplier",
@@ -70,6 +87,7 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   "date yyyy mm dd": "purchaseDate",
   "invoice date": "purchaseDate",
   "bill date": "purchaseDate",
+  "note date": "purchaseDate",
   "taxable value": "taxableValue",
   "taxable amount": "taxableValue",
   "value": "taxableValue",
@@ -79,12 +97,20 @@ const FIELD_ALIASES: Record<string, keyof ParsedRow> = {
   // Specific tax type columns (% and "rate" both stripped during normalization)
   "igst rate": "igstRate",
   "igst": "igstRate",
+  "igst amount": "igstAmount",
+  "igst amt": "igstAmount",
   "cgst rate": "cgstRate",
   "cgst": "cgstRate",
+  "cgst amount": "cgstAmount",
+  "cgst amt": "cgstAmount",
   "sgst rate": "sgstRate",
   "sgst": "sgstRate",
+  "sgst amount": "sgstAmount",
+  "sgst amt": "sgstAmount",
   "utgst rate": "sgstRate",
   "utgst": "sgstRate",
+  "utgst amount": "sgstAmount",
+  "utgst amt": "sgstAmount",
   // Legacy / convenience: treats as IGST
   "gst rate": "gstRate",
   "tax rate": "gstRate",
@@ -219,7 +245,10 @@ function parseDate(v: string): string {
   return "";
 }
 
-const NUMERIC_FIELDS = new Set<keyof ParsedRow>(["taxableValue", "igstRate", "cgstRate", "sgstRate", "gstRate"]);
+const NUMERIC_FIELDS = new Set<keyof ParsedRow>([
+  "taxableValue", "igstRate", "cgstRate", "sgstRate", "gstRate",
+  "igstAmount", "cgstAmount", "sgstAmount"
+]);
 
 function rowToInvoice(row: ParsedRow): Invoice {
   const base = newInvoice();
@@ -248,6 +277,9 @@ function rowToInvoice(row: ParsedRow): Invoice {
     igstRate,
     cgstRate,
     sgstRate,
+    igstAmount: row.igstAmount,
+    cgstAmount: row.cgstAmount,
+    sgstAmount: row.sgstAmount,
     usage,
     nonBusinessUse,
     itemType: row.itemType ?? "capital_good",
@@ -303,6 +335,30 @@ function parseRawRows(rawRows: Record<string, string>[]): { invoices: Invoice[];
     if (!row.taxableValue || !row.purchaseDate) {
       skipped++;
       continue;
+    }
+
+    // Check if this row is a Credit Note linked to a parent invoice
+    const isCreditNote = row.docType === "credit_note" || (row.originalInvoiceNo && row.originalInvoiceNo.trim() !== "");
+    if (isCreditNote && row.originalInvoiceNo) {
+      const origNoClean = row.originalInvoiceNo.trim().toLowerCase();
+      const parentInv = invoices.find((i) => i.invoiceNo.trim().toLowerCase() === origNoClean);
+      if (parentInv) {
+        if (!parentInv.creditNotes) parentInv.creditNotes = [];
+        parentInv.creditNotes.push({
+          id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()),
+          creditNoteNo: row.invoiceNo || "CN-" + (parentInv.creditNotes.length + 1),
+          date: row.purchaseDate,
+          taxableValue: Math.abs(row.taxableValue),
+          igstRate: row.igstRate ?? parentInv.igstRate,
+          cgstRate: row.cgstRate ?? parentInv.cgstRate,
+          sgstRate: row.sgstRate ?? parentInv.sgstRate,
+          igstAmount: row.igstAmount,
+          cgstAmount: row.cgstAmount,
+          sgstAmount: row.sgstAmount,
+          includeMonthInReversal: true,
+        });
+        continue;
+      }
     }
 
     invoices.push(rowToInvoice(row));

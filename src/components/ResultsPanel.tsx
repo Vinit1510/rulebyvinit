@@ -1480,9 +1480,42 @@ function ConsolidatedReport({
     }
   };
 
+  const totalTmIgst = affectedInvoices.reduce((s, x) => s + (x.res.tmIgst || 0), 0);
+  const totalTmCgst = affectedInvoices.reduce((s, x) => s + (x.res.tmCgst || 0), 0);
+  const totalTmSgst = affectedInvoices.reduce((s, x) => s + (x.res.tmSgst || 0), 0);
+  const totalTmCombined = totalTmIgst + totalTmCgst + totalTmSgst;
+
   return (
     <div className="space-y-5">
       <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
+
+      {/* Component-wise Common Credit Tm strip */}
+      {totalTmCombined > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-2 shadow-sm">
+          <div className="text-xs font-bold text-foreground flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" /> Monthly Common Credit Pool (T<sub>m</sub> = T<sub>c</sub> / 60)</span>
+            <span className="text-[10px] bg-muted px-2 py-0.5 rounded font-mono text-muted-foreground">Rule 43(1)(h)</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
+            <div className="p-2.5 rounded bg-muted/40 border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">T<sub>m</sub> (IGST)</div>
+              <div className="num font-bold text-primary text-sm mt-0.5">{formatINRPrecise(totalTmIgst)} / mo</div>
+            </div>
+            <div className="p-2.5 rounded bg-muted/40 border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">T<sub>m</sub> (CGST)</div>
+              <div className="num font-bold text-primary text-sm mt-0.5">{formatINRPrecise(totalTmCgst)} / mo</div>
+            </div>
+            <div className="p-2.5 rounded bg-muted/40 border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">T<sub>m</sub> (SGST/UTGST)</div>
+              <div className="num font-bold text-primary text-sm mt-0.5">{formatINRPrecise(totalTmSgst)} / mo</div>
+            </div>
+            <div className="p-2.5 rounded bg-primary/10 border border-primary/20">
+              <div className="text-[10px] text-primary font-semibold uppercase">Total T<sub>m</sub> Pool</div>
+              <div className="num font-black text-primary text-sm mt-0.5">{formatINRPrecise(totalTmCombined)} / mo</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reversal summary strip */}
       {totalReversal > 0 && (
