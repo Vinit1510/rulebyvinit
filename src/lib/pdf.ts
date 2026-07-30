@@ -18,6 +18,9 @@ export interface PdfDetailedRow {
   taxableValue: number;
   gstPercent: number;
   exemptPercent: number;
+  tmIgst?: number;
+  tmCgst?: number;
+  tmSgst?: number;
   eligibleItc: number;
   reversal: number;
   netClaim: number;
@@ -76,10 +79,6 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
     ["Total Entries", String(opts.totalEntries)],
     ["Total Capital Goods Value", fmt(opts.totalCapitalGoodsValue)],
     ["Total ITC (incl. CN/DN adj.)", fmt(opts.totalActualItc)],
-    ["Monthly Common Credit Tm (IGST)", fmt(opts.totalTmIgst ?? 0)],
-    ["Monthly Common Credit Tm (CGST)", fmt(opts.totalTmCgst ?? 0)],
-    ["Monthly Common Credit Tm (SGST)", fmt(opts.totalTmSgst ?? 0)],
-    ["Total Monthly Common Credit Tm Pool", fmt(opts.totalTmCombined ?? 0)],
     ["Total Reversal", fmt(opts.totalReversal)],
     ["Net ITC Claimed", fmt(opts.netItcClaimed)],
   ];
@@ -110,7 +109,8 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
     startY: lastY,
     head: [[
       "Period", "Invoice No", "Party", "Asset",
-      "Taxable Value", "GST%", "Exempt%", "Eligible ITC",
+      "Taxable Value", "GST%", "Exempt%",
+      "Tm (IGST)", "Tm (CGST)", "Tm (SGST)", "Total Tm",
       "IGST Rev", "CGST Rev", "SGST Rev", "Total Rev", "Net Claim",
     ]],
     body: opts.detailedRows.map((r) => [
@@ -121,6 +121,9 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
       fmt(r.taxableValue),
       r.gstPercent.toFixed(2),
       r.exemptPercent.toFixed(2),
+      fmt(r.tmIgst ?? 0),
+      fmt(r.tmCgst ?? 0),
+      fmt(r.tmSgst ?? 0),
       fmt(r.eligibleItc),
       fmt(r.igstReversal ?? 0),
       fmt(r.cgstReversal ?? 0),
@@ -131,6 +134,9 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
     foot: [[
       "TOTAL", "", "", "",
       fmt(opts.totalCapitalGoodsValue), "", "",
+      fmt(opts.detailedRows.reduce((s, x) => s + (x.tmIgst ?? 0), 0)),
+      fmt(opts.detailedRows.reduce((s, x) => s + (x.tmCgst ?? 0), 0)),
+      fmt(opts.detailedRows.reduce((s, x) => s + (x.tmSgst ?? 0), 0)),
       fmt(opts.detailedRows.reduce((s, x) => s + x.eligibleItc, 0)),
       fmt(sumIgst), fmt(sumCgst), fmt(sumSgst),
       fmt(opts.totalReversal),
@@ -138,19 +144,22 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
     ]],
     theme: "striped",
     showFoot: "lastPage",
-    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 8, halign: "center" },
-    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 8, halign: "right" },
-    bodyStyles: { fontSize: 7 },
+    headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 7, halign: "center" },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 7, halign: "right" },
+    bodyStyles: { fontSize: 6.5 },
     columnStyles: {
       4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" },
-      7: { halign: "right" },
-      8:  { halign: "right", textColor: [185, 28, 28] },
-      9:  { halign: "right", textColor: [185, 28, 28] },
-      10: { halign: "right", textColor: [185, 28, 28] },
-      11: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
-      12: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
+      7: { halign: "right", textColor: [15, 118, 110] },
+      8: { halign: "right", textColor: [15, 118, 110] },
+      9: { halign: "right", textColor: [15, 118, 110] },
+      10: { halign: "right", fontStyle: "bold" },
+      11: { halign: "right", textColor: [185, 28, 28] },
+      12: { halign: "right", textColor: [185, 28, 28] },
+      13: { halign: "right", textColor: [185, 28, 28] },
+      14: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+      15: { halign: "right", textColor: [21, 128, 61], fontStyle: "bold" },
     },
-    margin: { left: 18, right: 18 },
+    margin: { left: 14, right: 14 },
     didDrawPage: () => {
       const w = doc.internal.pageSize.getWidth();
       const h = doc.internal.pageSize.getHeight();

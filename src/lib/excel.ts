@@ -24,6 +24,9 @@ export interface DetailedRow {
   taxableValue: number;
   gstPercent: number;
   exemptPercent: number;
+  tmIgst?: number;
+  tmCgst?: number;
+  tmSgst?: number;
   eligibleItc: number;
   reversal: number;
   netClaim: number;
@@ -145,20 +148,21 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
   wb.creator = "Rule 43 ITC Calculator";
   wb.created = new Date();
 
-  // Columns A..M (13)
-  const TOTAL_COLS = 13;
+  // Columns A..P (16)
+  const TOTAL_COLS = 16;
   const ws = wb.addWorksheet("Summary", { views: [{ state: "frozen", ySplit: 5 }] });
   ws.columns = [
     { width: 14 }, { width: 18 }, { width: 26 }, { width: 28 },
-    { width: 16 }, { width: 10 }, { width: 12 }, { width: 14 },
+    { width: 16 }, { width: 10 }, { width: 12 },
+    { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 },
     { width: 13 }, { width: 13 }, { width: 13 }, { width: 14 }, { width: 14 },
   ];
 
-  ws.mergeCells("A1:M1");
+  ws.mergeCells("A1:P1");
   const t = ws.getCell("A1"); t.value = "RULE 43 REPORT SUMMARY"; applyTitleRow(t);
   ws.getRow(1).height = 26;
 
-  ws.mergeCells("A2:M2");
+  ws.mergeCells("A2:P2");
   const sub = ws.getCell("A2"); sub.value = opts.filterTitle;
   sub.font = { italic: true, color: { argb: HEADER_GREY }, size: 11 };
   sub.alignment = { horizontal: "center" };
@@ -191,13 +195,14 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
   }
   r++;
 
-  ws.mergeCells(`A${r}:M${r}`);
+  ws.mergeCells(`A${r}:P${r}`);
   const dh = ws.getCell(`A${r}`); dh.value = "DETAILED RECORDS"; applyTitleRow(dh);
   ws.getRow(r).height = 22;
   r++;
 
   const headers = ["Period", "Invoice No", "Party Name", "Asset / Machine / Product",
-    "Taxable Value", "GST %", "Exempt %", "Eligible ITC",
+    "Taxable Value", "GST %", "Exempt %",
+    "Tm (IGST)", "Tm (CGST)", "Tm (SGST)", "Total Tm",
     "IGST Reversal", "CGST Reversal", "SGST Reversal", "Total Reversal", "Net Claim"];
   headers.forEach((h, i) => {
     const c = ws.getCell(r, i + 1); c.value = h; applyHeader(c);
@@ -213,20 +218,23 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
     ws.getCell(r, 5).value = row.taxableValue;
     ws.getCell(r, 6).value = row.gstPercent;
     ws.getCell(r, 7).value = row.exemptPercent;
-    ws.getCell(r, 8).value = row.eligibleItc;
-    ws.getCell(r, 9).value = row.igstReversal ?? 0;
-    ws.getCell(r, 10).value = row.cgstReversal ?? 0;
-    ws.getCell(r, 11).value = row.sgstReversal ?? 0;
-    ws.getCell(r, 12).value = row.reversal;
-    ws.getCell(r, 13).value = row.netClaim;
-    [5, 8, 9, 10, 11, 12, 13].forEach((col) => applyMoneyFormat(ws.getCell(r, col)));
+    ws.getCell(r, 8).value = row.tmIgst ?? 0;
+    ws.getCell(r, 9).value = row.tmCgst ?? 0;
+    ws.getCell(r, 10).value = row.tmSgst ?? 0;
+    ws.getCell(r, 11).value = row.eligibleItc;
+    ws.getCell(r, 12).value = row.igstReversal ?? 0;
+    ws.getCell(r, 13).value = row.cgstReversal ?? 0;
+    ws.getCell(r, 14).value = row.sgstReversal ?? 0;
+    ws.getCell(r, 15).value = row.reversal;
+    ws.getCell(r, 16).value = row.netClaim;
+    [5, 8, 9, 10, 11, 12, 13, 14, 15, 16].forEach((col) => applyMoneyFormat(ws.getCell(r, col)));
     [6, 7].forEach((col) => { ws.getCell(r, col).numFmt = '0.00"%"'; ws.getCell(r, col).alignment = { horizontal: "right" }; });
-    [9, 10, 11, 12].forEach((col) => {
+    [12, 13, 14, 15].forEach((col) => {
       ws.getCell(r, col).fill = { type: "pattern", pattern: "solid", fgColor: { argb: REVERSAL_RED } };
-      ws.getCell(r, col).font = { color: { argb: "FFB91C1C" }, bold: col === 12 };
+      ws.getCell(r, col).font = { color: { argb: "FFB91C1C" }, bold: col === 15 };
     });
-    ws.getCell(r, 13).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
-    ws.getCell(r, 13).font = { color: { argb: "FF15803D" }, bold: true };
+    ws.getCell(r, 16).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
+    ws.getCell(r, 16).font = { color: { argb: "FF15803D" }, bold: true };
     applyZebra(ws.getRow(r), i % 2 === 1);
     rowBorders(ws, r, TOTAL_COLS);
     r++;
@@ -241,12 +249,15 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
   };
   tot(5, opts.totalCapitalGoodsValue);
-  tot(8, opts.detailedRows.reduce((s, x) => s + x.eligibleItc, 0));
-  tot(9, opts.detailedRows.reduce((s, x) => s + (x.igstReversal ?? 0), 0));
-  tot(10, opts.detailedRows.reduce((s, x) => s + (x.cgstReversal ?? 0), 0));
-  tot(11, opts.detailedRows.reduce((s, x) => s + (x.sgstReversal ?? 0), 0));
-  tot(12, opts.detailedRows.reduce((s, x) => s + x.reversal, 0));
-  tot(13, opts.detailedRows.reduce((s, x) => s + x.netClaim, 0));
+  tot(8, opts.detailedRows.reduce((s, x) => s + (x.tmIgst ?? 0), 0));
+  tot(9, opts.detailedRows.reduce((s, x) => s + (x.tmCgst ?? 0), 0));
+  tot(10, opts.detailedRows.reduce((s, x) => s + (x.tmSgst ?? 0), 0));
+  tot(11, opts.detailedRows.reduce((s, x) => s + x.eligibleItc, 0));
+  tot(12, opts.detailedRows.reduce((s, x) => s + (x.igstReversal ?? 0), 0));
+  tot(13, opts.detailedRows.reduce((s, x) => s + (x.cgstReversal ?? 0), 0));
+  tot(14, opts.detailedRows.reduce((s, x) => s + (x.sgstReversal ?? 0), 0));
+  tot(15, opts.detailedRows.reduce((s, x) => s + x.reversal, 0));
+  tot(16, opts.detailedRows.reduce((s, x) => s + x.netClaim, 0));
   const tcell = ws.getCell(totalRow, 1);
   tcell.font = { bold: true, color: { argb: "FFFFFFFF" } };
   tcell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_GREY } };
