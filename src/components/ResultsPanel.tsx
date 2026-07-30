@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText } from "lucide-react";
+import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText, Calendar, Clock } from "lucide-react";
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
@@ -1235,64 +1235,116 @@ function FilterBar({
   availableYears: number[];
 }) {
   return (
-    <Card className="no-print">
-      <CardContent className="py-4 space-y-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Filter type</Label>
-            <Select value={filter.mode} onValueChange={(v) => setFilter({ ...filter, mode: v as FilterMode })}>
-              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="year">Full Financial Year</SelectItem>
-                <SelectItem value="month">Single Month</SelectItem>
-                <SelectItem value="range">Custom Date Range</SelectItem>
-              </SelectContent>
-            </Select>
+    <Card className="no-print border border-border/80 shadow-sm bg-card/60 backdrop-blur-md">
+      <CardContent className="p-4 space-y-3.5">
+        {/* Top Control Bar: Filter Mode & Active Period Display */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Filter Mode Selector (Pills) */}
+          <div className="space-y-1">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" /> Report Time Period Mode
+            </Label>
+            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-lg border w-fit">
+              <Button
+                type="button"
+                variant={filter.mode === "year" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 text-xs px-3 font-semibold ${filter.mode === "year" ? "shadow-xs" : ""}`}
+                onClick={() => setFilter({ ...filter, mode: "year" })}
+              >
+                Full Financial Year
+              </Button>
+              <Button
+                type="button"
+                variant={filter.mode === "month" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 text-xs px-3 font-semibold ${filter.mode === "month" ? "shadow-xs" : ""}`}
+                onClick={() => setFilter({ ...filter, mode: "month" })}
+              >
+                Single Month
+              </Button>
+              <Button
+                type="button"
+                variant={filter.mode === "range" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 text-xs px-3 font-semibold ${filter.mode === "range" ? "shadow-xs" : ""}`}
+                onClick={() => setFilter({ ...filter, mode: "range" })}
+              >
+                Custom Date Range
+              </Button>
+            </div>
           </div>
-          {(filter.mode === "year" || filter.mode === "month") && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Financial Year</Label>
-              <Select value={String(filter.fy)} onValueChange={(v) => setFilter({ ...filter, fy: Number(v) })}>
-                <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {availableYears.map((y) => (
-                    <SelectItem key={y} value={String(y)}>FY {fyLabel(y)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {filter.mode === "month" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Month</Label>
-              <Select value={filter.month} onValueChange={(v) => setFilter({ ...filter, month: v })}>
-                <SelectTrigger className="w-[120px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MONTH_NAMES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {filter.mode === "range" && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs">From</Label>
-                <Input type="month" className="h-9 w-[160px]"
-                  value={(filter.from ?? "").slice(0,7)}
-                  onChange={(e) => setFilter({ ...filter, from: e.target.value ? `${e.target.value}-01` : undefined })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">To</Label>
-                <Input type="month" className="h-9 w-[160px]"
-                  value={(filter.to ?? "").slice(0,7)}
-                  onChange={(e) => setFilter({ ...filter, to: e.target.value ? `${e.target.value}-01` : undefined })} />
-              </div>
-            </>
-          )}
-          <div className="ml-auto text-xs text-muted-foreground">
-            Showing: <span className="font-medium text-foreground">{filterTitle(filter)}</span>
+
+          {/* Active Period Display Badge */}
+          <div className="px-3.5 py-2 rounded-xl bg-primary/10 border border-primary/20 text-xs font-semibold text-primary flex items-center gap-2 shadow-xs">
+            <Clock className="h-4 w-4" />
+            <span>Active Period: <strong className="text-foreground">{filterTitle(filter)}</strong></span>
           </div>
         </div>
+
+        {/* Dynamic Controls based on selected Mode */}
+        {(filter.mode === "year" || filter.mode === "month") && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select Financial Year</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              {availableYears.map((y) => (
+                <Button
+                  key={y}
+                  type="button"
+                  variant={filter.fy === y ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3 font-medium"
+                  onClick={() => setFilter({ ...filter, fy: y })}
+                >
+                  FY {fyLabel(y)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filter.mode === "month" && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select Month (FY {fyLabel(filter.fy)})</Label>
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5">
+              {MONTH_NAMES.map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  variant={filter.month === m ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-1 font-semibold"
+                  onClick={() => setFilter({ ...filter, month: m })}
+                >
+                  {m.slice(0, 3)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filter.mode === "range" && (
+          <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
+            <div className="space-y-1">
+              <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Start Month (From)</Label>
+              <Input
+                type="month"
+                className="h-8 w-[160px] text-xs bg-background"
+                value={(filter.from ?? "").slice(0, 7)}
+                onChange={(e) => setFilter({ ...filter, from: e.target.value ? `${e.target.value}-01` : undefined })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">End Month (To)</Label>
+              <Input
+                type="month"
+                className="h-8 w-[160px] text-xs bg-background"
+                value={(filter.to ?? "").slice(0, 7)}
+                onChange={(e) => setFilter({ ...filter, to: e.target.value ? `${e.target.value}-01` : undefined })}
+              />
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
