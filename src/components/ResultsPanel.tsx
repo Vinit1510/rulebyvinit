@@ -15,7 +15,7 @@ import {
 import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText, Calendar, Clock } from "lucide-react";
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
-  computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate,
+  computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate, computeItcComponents,
   type GstAmounts, type Rule42MonthResult, type Rule42AnnualReconciliation,
   computeRule42Month, reconcileRule42Annual, fyStartYear, fyLabel,
   isMonthWithinLicensedFY, getActiveLicenseFY,
