@@ -1306,20 +1306,18 @@ function FilterBar({
         {filter.mode === "month" && (
           <div className="space-y-1.5 pt-2 border-t">
             <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select Month (FY {fyLabel(filter.fy)})</Label>
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1.5">
-              {MONTH_NAMES.map((m) => (
-                <Button
-                  key={m}
-                  type="button"
-                  variant={filter.month === m ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-1 font-semibold"
-                  onClick={() => setFilter({ ...filter, month: m })}
-                >
-                  {m.slice(0, 3)}
-                </Button>
-              ))}
-            </div>
+            <Select value={filter.month} onValueChange={(v) => setFilter({ ...filter, month: v })}>
+              <SelectTrigger className="w-[200px] h-8 text-xs bg-background">
+                <SelectValue placeholder="Select Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((m) => (
+                  <SelectItem key={m} value={m} className="text-xs">
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
