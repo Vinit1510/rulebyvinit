@@ -319,6 +319,10 @@ export function exportRegisterPdf(opts: {
   });
 
   if (opts.blockedRows && opts.blockedRows.length > 0) {
+    const totIgst = opts.blockedRows.reduce((s, r) => s + (r.blockedIgst || 0), 0);
+    const totCgst = opts.blockedRows.reduce((s, r) => s + (r.blockedCgst || 0), 0);
+    const totSgst = opts.blockedRows.reduce((s, r) => s + (r.blockedSgst || 0), 0);
+
     doc.addPage();
     doc.setFillColor(185, 28, 28);
     doc.rect(0, 0, pageWidth, 48, "F");
@@ -326,20 +330,23 @@ export function exportRegisterPdf(opts: {
     doc.setFont("helvetica", "bold"); doc.setFontSize(15);
     doc.text("BLOCKED CREDIT — Section 17(5)", pageWidth / 2, 22, { align: "center" });
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.text(`Total Blocked ITC: Rs. ${fmt(opts.totalBlockedItc ?? 0)}`, pageWidth / 2, 38, { align: "center" });
+    doc.text(`Total Blocked ITC: Rs. ${fmt(opts.totalBlockedItc ?? 0)} (I: ${fmt(totIgst)} | C: ${fmt(totCgst)} | S: ${fmt(totSgst)})`, pageWidth / 2, 38, { align: "center" });
     autoTable(doc, {
       startY: 60,
-      head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "GST%", "Blocked ITC", "Reason"]],
+      head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "Blocked IGST", "Blocked CGST", "Blocked SGST", "Total Blocked ITC", "Reason"]],
       body: opts.blockedRows.map((r) => [
         r.date, r.invoiceNo, r.partyName, r.asset,
-        fmt(r.taxableValue), r.gstPercent.toFixed(2), fmt(r.blockedItc), r.reason ?? "",
+        fmt(r.taxableValue), fmt(r.blockedIgst || 0), fmt(r.blockedCgst || 0), fmt(r.blockedSgst || 0), fmt(r.blockedItc), r.reason ?? "",
       ]),
       theme: "striped",
       headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
       bodyStyles: { fontSize: 8 },
       columnStyles: {
-        4: { halign: "right" }, 5: { halign: "right" },
-        6: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+        4: { halign: "right" },
+        5: { halign: "right", textColor: [185, 28, 28] },
+        6: { halign: "right", textColor: [185, 28, 28] },
+        7: { halign: "right", textColor: [185, 28, 28] },
+        8: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
       },
       margin: { left: 24, right: 24 },
     });
@@ -363,11 +370,20 @@ export function exportBlockedCreditPdf(opts: {
   doc.setFont("helvetica", "normal"); doc.setFontSize(10);
   doc.text(opts.filterTitle, pageWidth / 2, 38, { align: "center" });
 
+  const totIgst = opts.rows.reduce((s, r) => s + (r.blockedIgst || 0), 0);
+  const totCgst = opts.rows.reduce((s, r) => s + (r.blockedCgst || 0), 0);
+  const totSgst = opts.rows.reduce((s, r) => s + (r.blockedSgst || 0), 0);
+  const totVal = opts.rows.reduce((s, r) => s + (r.taxableValue || 0), 0);
+
   autoTable(doc, {
     startY: 60,
     head: [["SUMMARY", ""]],
     body: [
       ["Total Blocked Entries", String(opts.rows.length)],
+      ["Total Taxable Value", fmt(totVal)],
+      ["Blocked IGST", fmt(totIgst)],
+      ["Blocked CGST", fmt(totCgst)],
+      ["Blocked SGST", fmt(totSgst)],
       ["Total Blocked ITC (ineligible)", fmt(opts.totalBlockedItc)],
     ],
     theme: "grid",
@@ -380,20 +396,23 @@ export function exportBlockedCreditPdf(opts: {
   const y = (doc as any).lastAutoTable.finalY + 16;
   autoTable(doc, {
     startY: y,
-    head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "GST%", "Blocked ITC", "Reason / Notes"]],
+    head: [["Date", "Invoice No", "Party", "Asset", "Taxable Value", "Blocked IGST", "Blocked CGST", "Blocked SGST", "Total Blocked ITC", "Reason / Notes"]],
     body: opts.rows.map((r) => [
       r.date, r.invoiceNo, r.partyName, r.asset,
-      fmt(r.taxableValue), r.gstPercent.toFixed(2), fmt(r.blockedItc), r.reason ?? "",
+      fmt(r.taxableValue), fmt(r.blockedIgst || 0), fmt(r.blockedCgst || 0), fmt(r.blockedSgst || 0), fmt(r.blockedItc), r.reason ?? "",
     ]),
-    foot: [["TOTAL", "", "", "", "", "", fmt(opts.totalBlockedItc), ""]],
+    foot: [["TOTAL", "", "", "", fmt(totVal), fmt(totIgst), fmt(totCgst), fmt(totSgst), fmt(opts.totalBlockedItc), ""]],
     theme: "striped",
     showFoot: "lastPage",
     headStyles: { fillColor: HEADER, textColor: 255, fontStyle: "bold", fontSize: 9 },
-    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 9 },
+    footStyles: { fillColor: BAND, textColor: 0, fontStyle: "bold", fontSize: 9, halign: "right" },
     bodyStyles: { fontSize: 8 },
     columnStyles: {
-      4: { halign: "right" }, 5: { halign: "right" },
-      6: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
+      4: { halign: "right" },
+      5: { halign: "right", textColor: [185, 28, 28] },
+      6: { halign: "right", textColor: [185, 28, 28] },
+      7: { halign: "right", textColor: [185, 28, 28] },
+      8: { halign: "right", textColor: [185, 28, 28], fontStyle: "bold" },
     },
     margin: { left: 24, right: 24 },
     didDrawPage: () => {
