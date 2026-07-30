@@ -625,6 +625,9 @@ export interface ConsolidatedRow {
   total: number;
   ratio: number;
   totalMonthlyItc: number;
+  tmIgst: number;
+  tmCgst: number;
+  tmSgst: number;
   totalReversal: number;
   totalRetained: number;
   igstReversal: number;
@@ -651,7 +654,8 @@ export function consolidate(
     rowByKey.set(k, {
       monthKey: k, monthLabel: monthLabel(d), date: d,
       exempt: t.exempt || 0, total, ratio: safeRatio(t.exempt || 0, total),
-      totalMonthlyItc: 0, totalReversal: 0, totalRetained: 0,
+      totalMonthlyItc: 0, tmIgst: 0, tmCgst: 0, tmSgst: 0,
+      totalReversal: 0, totalRetained: 0,
       igstReversal: 0, cgstReversal: 0, sgstReversal: 0,
       cumReversal: 0, cumRetained: 0, invoiceCount: 0,
     });
@@ -662,6 +666,9 @@ export function consolidate(
       const row = rowByKey.get(r.monthKey);
       if (!row) continue;
       row.totalMonthlyItc += r.monthlyItc;
+      row.tmIgst += res.tmIgst;
+      row.tmCgst += res.tmCgst;
+      row.tmSgst += res.tmSgst;
       row.totalReversal += r.reversal;
       row.totalRetained += r.retained;
       row.igstReversal += r.igstReversal;

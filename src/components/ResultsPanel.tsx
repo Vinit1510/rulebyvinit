@@ -1512,6 +1512,10 @@ function ConsolidatedReport({
     totalEntries,
     totalCapitalGoodsValue: totalCapitalValue,
     totalActualItc,
+    totalTmIgst,
+    totalTmCgst,
+    totalTmSgst,
+    totalTmCombined,
     totalReversal: totalReversalCumulative,
     netItcClaimed,
     detailedRows: filteredInvoiceRows,
@@ -1651,28 +1655,34 @@ function ConsolidatedReport({
           <div className="max-h-[420px] overflow-y-auto w-full">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
-                <TableRow>
-                  <TableHead>Month</TableHead>
+                <TableRow className="bg-muted/30 text-xs">
+                  <TableHead className="w-[110px]">Month</TableHead>
                   <TableHead className="text-right">Ratio</TableHead>
-                  <TableHead className="text-right">Total Tm</TableHead>
-                  <TableHead className="text-right text-destructive">IGST Reversal</TableHead>
-                  <TableHead className="text-right text-orange-600">CGST Reversal</TableHead>
-                  <TableHead className="text-right text-amber-600">SGST Reversal</TableHead>
-                  <TableHead className="text-right">Total Reversal</TableHead>
-                  <TableHead className="text-right">Cum. Reversal</TableHead>
+                  <TableHead className="text-right text-primary font-bold">T<sub>m</sub> (IGST)</TableHead>
+                  <TableHead className="text-right text-primary font-bold">T<sub>m</sub> (CGST)</TableHead>
+                  <TableHead className="text-right text-primary font-bold">T<sub>m</sub> (SGST)</TableHead>
+                  <TableHead className="text-right font-bold">Total T<sub>m</sub></TableHead>
+                  <TableHead className="text-right text-destructive font-bold">IGST Reversal</TableHead>
+                  <TableHead className="text-right text-orange-600 font-bold">CGST Reversal</TableHead>
+                  <TableHead className="text-right text-amber-600 font-bold">SGST Reversal</TableHead>
+                  <TableHead className="text-right font-bold">Total Reversal</TableHead>
+                  <TableHead className="text-right font-bold">Cum. Reversal</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow key={r.monthKey} className="hover:bg-muted/40">
-                    <TableCell className="text-sm">{r.monthLabel}</TableCell>
+                  <TableRow key={r.monthKey} className="hover:bg-muted/40 text-xs">
+                    <TableCell className="font-medium">{r.monthLabel}</TableCell>
                     <TableCell className="text-right num text-xs">{(r.ratio * 100).toFixed(1)}%</TableCell>
-                    <TableCell className="text-right num text-xs">{formatINR(r.totalMonthlyItc)}</TableCell>
-                    <TableCell className="text-right num text-xs text-destructive">{formatINRPrecise(r.igstReversal)}</TableCell>
-                    <TableCell className="text-right num text-xs text-orange-600 dark:text-orange-400">{formatINRPrecise(r.cgstReversal)}</TableCell>
-                    <TableCell className="text-right num text-xs text-amber-600 dark:text-amber-400">{formatINRPrecise(r.sgstReversal)}</TableCell>
-                    <TableCell className="text-right num text-xs font-medium">{formatINRPrecise(r.totalReversal)}</TableCell>
-                    <TableCell className="text-right num text-xs">{formatINR(r.cumReversal)}</TableCell>
+                    <TableCell className="text-right num text-xs text-primary">{formatINRPrecise(r.tmIgst)}</TableCell>
+                    <TableCell className="text-right num text-xs text-primary">{formatINRPrecise(r.tmCgst)}</TableCell>
+                    <TableCell className="text-right num text-xs text-primary">{formatINRPrecise(r.tmSgst)}</TableCell>
+                    <TableCell className="text-right num text-xs font-semibold">{formatINRPrecise(r.totalMonthlyItc)}</TableCell>
+                    <TableCell className="text-right num text-xs text-destructive font-medium">{formatINRPrecise(r.igstReversal)}</TableCell>
+                    <TableCell className="text-right num text-xs text-orange-600 dark:text-orange-400 font-medium">{formatINRPrecise(r.cgstReversal)}</TableCell>
+                    <TableCell className="text-right num text-xs text-amber-600 dark:text-amber-400 font-medium">{formatINRPrecise(r.sgstReversal)}</TableCell>
+                    <TableCell className="text-right num text-xs font-bold">{formatINRPrecise(r.totalReversal)}</TableCell>
+                    <TableCell className="text-right num text-xs text-muted-foreground">{formatINR(r.cumReversal)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
