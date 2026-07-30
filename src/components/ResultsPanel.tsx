@@ -2156,7 +2156,9 @@ function RegisterSummary({ invoices, turnover }: { invoices: Invoice[]; turnover
     asset: inv.assetName, supplier: inv.supplier,
     gstin: inv.gstin ?? "",
     taxableValue: inv.taxableValue, netItc: res.netTotalItc,
-    igstRev: res.igstReversal, cgstRev: res.cgstReversal, sgstRev: res.sgstReversal,
+    igstRev: res.status === "block-credit" ? res.netIgstItc : res.igstReversal,
+    cgstRev: res.status === "block-credit" ? res.netCgstItc : res.cgstReversal,
+    sgstRev: res.status === "block-credit" ? res.netSgstItc : res.sgstReversal,
     retained: res.totalRetained, status: STATUS_LABEL[res.status].label,
   }));
 
@@ -2221,6 +2223,10 @@ function RegisterSummary({ invoices, turnover }: { invoices: Invoice[]; turnover
               const s = STATUS_LABEL[res.status];
               const cnCount = (inv.creditNotes ?? []).length;
               const dnCount = (inv.debitNotes ?? []).length;
+              const isBlocked = res.status === "block-credit";
+              const igstVal = isBlocked ? res.netIgstItc : res.igstReversal;
+              const cgstVal = isBlocked ? res.netCgstItc : res.cgstReversal;
+              const sgstVal = isBlocked ? res.netSgstItc : res.sgstReversal;
               return (
                 <TableRow key={inv.id} className="hover:bg-muted/40">
                   <TableCell className="text-sm font-medium">{inv.invoiceNo || "—"}</TableCell>
@@ -2235,9 +2241,18 @@ function RegisterSummary({ invoices, turnover }: { invoices: Invoice[]; turnover
                     {cnCount > 0 && <div className="text-amber-600">{cnCount} CN −{formatINR(res.totalCreditNoteItc)}</div>}
                     {dnCount > 0 && <div className="text-green-600 dark:text-green-400">{dnCount} DN +{formatINR(res.totalDebitNoteItc)}</div>}
                   </TableCell>
-                  <TableCell className="text-right num text-xs text-destructive">{formatINR(res.igstReversal)}</TableCell>
-                  <TableCell className="text-right num text-xs text-orange-600 dark:text-orange-400">{formatINR(res.cgstReversal)}</TableCell>
-                  <TableCell className="text-right num text-xs text-amber-600 dark:text-amber-400">{formatINR(res.sgstReversal)}</TableCell>
+                  <TableCell className="text-right num text-xs text-destructive">
+                    {formatINR(igstVal)}
+                    {isBlocked && igstVal > 0 && <div className="text-[9px] font-semibold text-destructive uppercase">Blocked</div>}
+                  </TableCell>
+                  <TableCell className="text-right num text-xs text-orange-600 dark:text-orange-400">
+                    {formatINR(cgstVal)}
+                    {isBlocked && cgstVal > 0 && <div className="text-[9px] font-semibold text-orange-600 dark:text-orange-400 uppercase">Blocked</div>}
+                  </TableCell>
+                  <TableCell className="text-right num text-xs text-amber-600 dark:text-amber-400">
+                    {formatINR(sgstVal)}
+                    {isBlocked && sgstVal > 0 && <div className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 uppercase">Blocked</div>}
+                  </TableCell>
                   <TableCell className="text-right num text-sm">{formatINR(res.totalRetained)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
