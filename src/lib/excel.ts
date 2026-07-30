@@ -456,12 +456,12 @@ export async function exportBlockedCreditXlsx(
   const ws = wb.addWorksheet("Blocked Credit (17(5))", { views: [{ state: "frozen", ySplit: 5 }] });
   ws.columns = [
     { width: 14 }, { width: 18 }, { width: 26 }, { width: 28 },
-    { width: 16 }, { width: 10 }, { width: 16 }, { width: 32 },
+    { width: 16 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 18 }, { width: 32 },
   ];
-  ws.mergeCells("A1:H1");
+  ws.mergeCells("A1:K1");
   const t = ws.getCell("A1"); t.value = "BLOCKED CREDIT — Section 17(5)"; applyTitleRow(t);
   ws.getRow(1).height = 26;
-  ws.mergeCells("A2:H2");
+  ws.mergeCells("A2:K2");
   const sub = ws.getCell("A2"); sub.value = opts.filterTitle;
   sub.font = { italic: true, color: { argb: HEADER_GREY }, size: 11 };
   sub.alignment = { horizontal: "center" };
@@ -472,7 +472,7 @@ export async function exportBlockedCreditXlsx(
   const sumVal = ws.getCell("E4"); sumVal.value = opts.totalBlockedItc; applyMoneyFormat(sumVal);
   sumVal.font = { bold: true, color: { argb: "FFB91C1C" } };
 
-  const headers = ["Date", "Invoice No", "Party Name", "Asset", "Taxable Value", "GST %", "Blocked ITC", "Reason / Notes"];
+  const headers = ["Date", "Invoice No", "Party Name", "Asset", "Taxable Value", "GST %", "Blocked IGST", "Blocked CGST", "Blocked SGST", "Total Blocked ITC", "Reason / Notes"];
   headers.forEach((h, i) => { const c = ws.getCell(6, i + 1); c.value = h; applyHeader(c); });
   ws.getRow(6).height = 30;
 
@@ -484,14 +484,19 @@ export async function exportBlockedCreditXlsx(
     ws.getCell(rr, 4).value = row.asset;
     ws.getCell(rr, 5).value = row.taxableValue;
     ws.getCell(rr, 6).value = row.gstPercent;
-    ws.getCell(rr, 7).value = row.blockedItc;
-    ws.getCell(rr, 8).value = row.reason ?? "";
-    [5, 7].forEach((col) => applyMoneyFormat(ws.getCell(rr, col)));
+    ws.getCell(rr, 7).value = row.blockedIgst ?? 0;
+    ws.getCell(rr, 8).value = row.blockedCgst ?? 0;
+    ws.getCell(rr, 9).value = row.blockedSgst ?? 0;
+    ws.getCell(rr, 10).value = row.blockedItc;
+    ws.getCell(rr, 11).value = row.reason ?? "";
+    [5, 7, 8, 9, 10].forEach((col) => applyMoneyFormat(ws.getCell(rr, col)));
     ws.getCell(rr, 6).numFmt = '0.00"%"';
-    ws.getCell(rr, 7).fill = { type: "pattern", pattern: "solid", fgColor: { argb: REVERSAL_RED } };
-    ws.getCell(rr, 7).font = { color: { argb: "FFB91C1C" }, bold: true };
+    [7, 8, 9, 10].forEach((col) => {
+      ws.getCell(rr, col).fill = { type: "pattern", pattern: "solid", fgColor: { argb: REVERSAL_RED } };
+      ws.getCell(rr, col).font = { color: { argb: "FFB91C1C" }, bold: col === 10 };
+    });
     applyZebra(ws.getRow(rr), i % 2 === 1);
-    rowBorders(ws, rr, 8);
+    rowBorders(ws, rr, 11);
   });
 
   const buf = await wb.xlsx.writeBuffer();

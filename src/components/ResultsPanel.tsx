@@ -1455,7 +1455,8 @@ function ConsolidatedReport({
       if (!inv.blockCredit || !inv.purchaseDate) continue;
       const d = new Date(inv.purchaseDate);
       if (!inFilter(d, filter)) continue;
-      const blockedItc = (inv.taxableValue || 0) * (totalGstRate(inv) / 100);
+      const { igstItc, cgstItc, sgstItc } = computeItcComponents(inv.taxableValue || 0, inv);
+      const blockedItc = igstItc + cgstItc + sgstItc;
       out.push({
         date: inv.purchaseDate,
         invoiceNo: inv.invoiceNo,
@@ -1463,13 +1464,20 @@ function ConsolidatedReport({
         asset: inv.assetName,
         taxableValue: inv.taxableValue,
         gstPercent: totalGstRate(inv),
+        blockedIgst: igstItc,
+        blockedCgst: cgstItc,
+        blockedSgst: sgstItc,
         blockedItc,
         reason: inv.notes ?? "Section 17(5)",
       });
     }
     return out;
   }, [invoices, filter]);
-  const totalBlockedItc = blockedRows.reduce((s, r) => s + r.blockedItc, 0);
+
+  const totalBlockedIgst = blockedRows.reduce((s, r) => s + (r.blockedIgst || 0), 0);
+  const totalBlockedCgst = blockedRows.reduce((s, r) => s + (r.blockedCgst || 0), 0);
+  const totalBlockedSgst = blockedRows.reduce((s, r) => s + (r.blockedSgst || 0), 0);
+  const totalBlockedItc = totalBlockedIgst + totalBlockedCgst + totalBlockedSgst;
 
   // Summary numbers — based on full per-invoice ITC and cumulative reversal up to the filter end.
   const totalEntries = affectedInvoices.length;
@@ -1596,19 +1604,36 @@ function ConsolidatedReport({
 
       {/* Block-credit summary strip */}
       {blockedRows.length > 0 && (
-        <Card className="border-destructive/40 bg-destructive/5">
+        <Card className="border-destructive/40 bg-destructive/5 shadow-xs">
           <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-destructive">Blocked credit u/s 17(5) — ineligible ITC</div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {blockedRows.length} invoice{blockedRows.length === 1 ? "" : "s"} in this period are flagged as blocked credit. The full ITC is ineligible.
-                </p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-sm font-bold text-destructive">Blocked Credit u/s 17(5) — Ineligible ITC</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {blockedRows.length} invoice{blockedRows.length === 1 ? "" : "s"} in this period flagged as blocked credit. Full ITC is ineligible.
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] text-muted-foreground">Total blocked ITC</div>
-                <div className="num font-semibold text-destructive text-lg">{formatINR(totalBlockedItc)}</div>
+
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked IGST</div>
+                  <div className="num font-bold text-destructive text-sm">{formatINRPrecise(totalBlockedIgst)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked CGST</div>
+                  <div className="num font-bold text-orange-600 dark:text-orange-400 text-sm">{formatINRPrecise(totalBlockedCgst)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked SGST</div>
+                  <div className="num font-bold text-amber-600 dark:text-amber-400 text-sm">{formatINRPrecise(totalBlockedSgst)}</div>
+                </div>
+                <div className="border-l pl-6">
+                  <div className="text-[10px] text-muted-foreground font-semibold uppercase">Total Blocked ITC</div>
+                  <div className="num font-black text-destructive text-lg">{formatINR(totalBlockedItc)}</div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -2167,7 +2192,8 @@ function BlockCreditReport({ invoices }: { invoices: Invoice[] }) {
     return blockedAll
       .filter((inv) => inv.purchaseDate && inFilter(new Date(inv.purchaseDate), filter))
       .map((inv) => {
-        const blockedItc = (inv.taxableValue || 0) * (totalGstRate(inv) / 100);
+        const { igstItc, cgstItc, sgstItc } = computeItcComponents(inv.taxableValue || 0, inv);
+        const blockedItc = igstItc + cgstItc + sgstItc;
         return {
           inv,
           row: {
@@ -2177,6 +2203,9 @@ function BlockCreditReport({ invoices }: { invoices: Invoice[] }) {
             asset: inv.assetName,
             taxableValue: inv.taxableValue,
             gstPercent: totalGstRate(inv),
+            blockedIgst: igstItc,
+            blockedCgst: cgstItc,
+            blockedSgst: sgstItc,
             blockedItc,
             reason: inv.notes ?? "Section 17(5)",
           } as BlockedRow,
@@ -2184,7 +2213,10 @@ function BlockCreditReport({ invoices }: { invoices: Invoice[] }) {
       });
   }, [blockedAll, filter]);
 
-  const totalBlockedItc = visible.reduce((s, x) => s + x.row.blockedItc, 0);
+  const totalBlockedIgst = visible.reduce((s, x) => s + (x.row.blockedIgst || 0), 0);
+  const totalBlockedCgst = visible.reduce((s, x) => s + (x.row.blockedCgst || 0), 0);
+  const totalBlockedSgst = visible.reduce((s, x) => s + (x.row.blockedSgst || 0), 0);
+  const totalBlockedItc = totalBlockedIgst + totalBlockedCgst + totalBlockedSgst;
   const totalTaxable = visible.reduce((s, x) => s + (x.inv.taxableValue || 0), 0);
 
   const handleXlsx = async () => {
@@ -2220,20 +2252,37 @@ function BlockCreditReport({ invoices }: { invoices: Invoice[] }) {
     <div className="space-y-5">
       <FilterBar filter={filter} setFilter={setFilter} availableYears={availableYears} />
 
-      <Card className="border-destructive/40 bg-destructive/5">
-        <CardContent className="py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Blocked invoices</div>
-              <div className="num font-semibold text-base">{visible.length}</div>
+      <Card className="border-destructive/40 bg-destructive/5 shadow-xs">
+        <CardContent className="py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-destructive flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4" /> Section 17(5) Ineligible Blocked Credit Summary
+            </span>
+            <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px]">
+              {visible.length} Blocked Invoices
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+            <div className="p-2.5 rounded bg-card border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">Total Taxable Value</div>
+              <div className="num font-bold text-sm mt-0.5">{formatINR(totalTaxable)}</div>
             </div>
-            <div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Total taxable value</div>
-              <div className="num font-semibold text-base">{formatINR(totalTaxable)}</div>
+            <div className="p-2.5 rounded bg-card border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked IGST</div>
+              <div className="num font-bold text-destructive text-sm mt-0.5">{formatINRPrecise(totalBlockedIgst)}</div>
             </div>
-            <div className="md:col-span-2 md:text-right">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Total blocked ITC (ineligible)</div>
-              <div className="num font-bold text-destructive text-2xl">{formatINR(totalBlockedItc)}</div>
+            <div className="p-2.5 rounded bg-card border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked CGST</div>
+              <div className="num font-bold text-orange-600 dark:text-orange-400 text-sm mt-0.5">{formatINRPrecise(totalBlockedCgst)}</div>
+            </div>
+            <div className="p-2.5 rounded bg-card border">
+              <div className="text-[10px] text-muted-foreground font-semibold uppercase">Blocked SGST</div>
+              <div className="num font-bold text-amber-600 dark:text-amber-400 text-sm mt-0.5">{formatINRPrecise(totalBlockedSgst)}</div>
+            </div>
+            <div className="p-2.5 rounded bg-destructive/15 border border-destructive/30">
+              <div className="text-[10px] text-destructive font-bold uppercase">Total Blocked ITC</div>
+              <div className="num font-black text-destructive text-base mt-0.5">{formatINRPrecise(totalBlockedItc)}</div>
             </div>
           </div>
         </CardContent>
@@ -2261,28 +2310,34 @@ function BlockCreditReport({ invoices }: { invoices: Invoice[] }) {
             <div className="max-h-[520px] overflow-y-auto w-full">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
-                  <TableRow>
+                  <TableRow className="text-xs">
                     <TableHead>Date</TableHead>
                     <TableHead>Invoice</TableHead>
                     <TableHead>Party</TableHead>
                     <TableHead>Asset</TableHead>
                     <TableHead className="text-right">Taxable Value</TableHead>
                     <TableHead className="text-right">GST %</TableHead>
-                    <TableHead className="text-right">Blocked ITC</TableHead>
+                    <TableHead className="text-right text-destructive font-bold">Blocked IGST</TableHead>
+                    <TableHead className="text-right text-orange-600 font-bold">Blocked CGST</TableHead>
+                    <TableHead className="text-right text-amber-600 font-bold">Blocked SGST</TableHead>
+                    <TableHead className="text-right text-destructive font-black">Total Blocked ITC</TableHead>
                     <TableHead>Reason / Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {visible.map(({ inv, row }) => (
-                    <TableRow key={inv.id} className="hover:bg-muted/40">
-                      <TableCell className="text-sm">{row.date || "—"}</TableCell>
-                      <TableCell className="text-sm font-medium">{row.invoiceNo || "—"}</TableCell>
-                      <TableCell className="text-sm">{row.partyName || "—"}</TableCell>
-                      <TableCell className="text-sm">{row.asset || "—"}</TableCell>
-                      <TableCell className="text-right num text-sm">{formatINR(row.taxableValue)}</TableCell>
-                      <TableCell className="text-right num text-xs">{row.gstPercent.toFixed(2)}%</TableCell>
-                      <TableCell className="text-right num text-sm font-semibold text-destructive">{formatINR(row.blockedItc)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate" title={row.reason}>{row.reason}</TableCell>
+                    <TableRow key={inv.id} className="hover:bg-muted/40 text-xs">
+                      <TableCell>{row.date || "—"}</TableCell>
+                      <TableCell className="font-medium">{row.invoiceNo || "—"}</TableCell>
+                      <TableCell>{row.partyName || "—"}</TableCell>
+                      <TableCell>{row.asset || "—"}</TableCell>
+                      <TableCell className="text-right num">{formatINR(row.taxableValue)}</TableCell>
+                      <TableCell className="text-right num">{row.gstPercent.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right num text-destructive font-medium">{formatINRPrecise(row.blockedIgst)}</TableCell>
+                      <TableCell className="text-right num text-orange-600 dark:text-orange-400 font-medium">{formatINRPrecise(row.blockedCgst)}</TableCell>
+                      <TableCell className="text-right num text-amber-600 dark:text-amber-400 font-medium">{formatINRPrecise(row.blockedSgst)}</TableCell>
+                      <TableCell className="text-right num font-bold text-destructive">{formatINRPrecise(row.blockedItc)}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-[220px] truncate" title={row.reason}>{row.reason}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

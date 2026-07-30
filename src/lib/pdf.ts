@@ -33,6 +33,9 @@ export interface PdfBlockedRow {
   asset: string;
   taxableValue: number;
   gstPercent: number;
+  blockedIgst?: number;
+  blockedCgst?: number;
+  blockedSgst?: number;
   blockedItc: number;
   reason?: string;
 }
