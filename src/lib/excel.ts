@@ -172,10 +172,6 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
     ["Total Entries", opts.totalEntries],
     ["Total Capital Goods Value", opts.totalCapitalGoodsValue],
     ["Total ITC (incl. CN/DN adj.)", opts.totalActualItc],
-    ["Monthly Common Credit Tm (IGST)", (opts as any).totalTmIgst ?? 0],
-    ["Monthly Common Credit Tm (CGST)", (opts as any).totalTmCgst ?? 0],
-    ["Monthly Common Credit Tm (SGST)", (opts as any).totalTmSgst ?? 0],
-    ["Total Monthly Common Credit Tm Pool", (opts as any).totalTmCombined ?? 0],
     ["Total Reversal", opts.totalReversal],
     ["Net ITC Claimed", opts.netItcClaimed],
   ];
