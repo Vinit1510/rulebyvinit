@@ -1286,20 +1286,18 @@ function FilterBar({
         {(filter.mode === "year" || filter.mode === "month") && (
           <div className="space-y-1.5 pt-2 border-t">
             <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select Financial Year</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              {availableYears.map((y) => (
-                <Button
-                  key={y}
-                  type="button"
-                  variant={filter.fy === y ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-3 font-medium"
-                  onClick={() => setFilter({ ...filter, fy: y })}
-                >
-                  FY {fyLabel(y)}
-                </Button>
-              ))}
-            </div>
+            <Select value={String(filter.fy)} onValueChange={(v) => setFilter({ ...filter, fy: Number(v) })}>
+              <SelectTrigger className="w-[200px] h-8 text-xs bg-background">
+                <SelectValue placeholder="Select Financial Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)} className="text-xs">
+                    FY {fyLabel(y)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
