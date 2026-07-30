@@ -275,6 +275,9 @@ export async function exportRule43Xlsx(opts: Rule43XlsxOptions, filename: string
 export interface InvoiceXlsxRow {
   period: string;
   ratio: number;
+  tmIgst?: number;
+  tmCgst?: number;
+  tmSgst?: number;
   monthlyItc: number;
   igst: number;
   cgst: number;
@@ -298,14 +301,14 @@ export async function exportInvoiceXlsx(opts: InvoiceXlsxOptions, filename: stri
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Invoice Working", { views: [{ state: "frozen", ySplit: 6 }] });
   ws.columns = [
-    { width: 16 }, { width: 10 }, { width: 14 }, { width: 14 },
-    { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 24 },
+    { width: 16 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 14 },
+    { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 24 },
   ];
 
-  ws.mergeCells("A1:J1");
+  ws.mergeCells("A1:M1");
   const t = ws.getCell("A1"); t.value = `RULE 43 WORKING — ${opts.invoiceNo || "(no #)"}`; applyTitleRow(t);
   ws.getRow(1).height = 26;
-  ws.mergeCells("A2:J2");
+  ws.mergeCells("A2:M2");
   const sub = ws.getCell("A2");
   sub.value = `${opts.asset || ""} · ${opts.supplier || ""} · ${opts.filterTitle}`;
   sub.font = { italic: true, color: { argb: HEADER_GREY }, size: 11 };
@@ -327,7 +330,7 @@ export async function exportInvoiceXlsx(opts: InvoiceXlsxOptions, filename: stri
   }
   r++;
 
-  const headers = ["Period", "Ratio %", "Tm (monthly)", "IGST Rev.", "CGST Rev.", "SGST Rev.", "Total Rev.", "Retained", "Cum. Rev.", "Note"];
+  const headers = ["Period", "Ratio %", "Tm (IGST)", "Tm (CGST)", "Tm (SGST)", "Total Tm", "IGST Rev.", "CGST Rev.", "SGST Rev.", "Total Rev.", "Retained", "Cum. Rev.", "Note"];
   headers.forEach((h, i) => { const c = ws.getCell(r, i + 1); c.value = h; applyHeader(c); });
   ws.getRow(r).height = 30;
   r++;
@@ -335,28 +338,34 @@ export async function exportInvoiceXlsx(opts: InvoiceXlsxOptions, filename: stri
   opts.rows.forEach((row, i) => {
     ws.getCell(r, 1).value = periodLabel(row.period);
     ws.getCell(r, 2).value = row.ratio * 100;
-    ws.getCell(r, 3).value = row.monthlyItc;
-    ws.getCell(r, 4).value = row.igst;
-    ws.getCell(r, 5).value = row.cgst;
-    ws.getCell(r, 6).value = row.sgst;
-    ws.getCell(r, 7).value = row.reversal;
-    ws.getCell(r, 8).value = row.retained;
-    ws.getCell(r, 9).value = row.cumReversal;
-    ws.getCell(r, 10).value = row.note ?? "";
-    [3, 4, 5, 6, 7, 8, 9].forEach((col) => applyMoneyFormat(ws.getCell(r, col)));
+    ws.getCell(r, 3).value = row.tmIgst ?? 0;
+    ws.getCell(r, 4).value = row.tmCgst ?? 0;
+    ws.getCell(r, 5).value = row.tmSgst ?? 0;
+    ws.getCell(r, 6).value = row.monthlyItc;
+    ws.getCell(r, 7).value = row.igst;
+    ws.getCell(r, 8).value = row.cgst;
+    ws.getCell(r, 9).value = row.sgst;
+    ws.getCell(r, 10).value = row.reversal;
+    ws.getCell(r, 11).value = row.retained;
+    ws.getCell(r, 12).value = row.cumReversal;
+    ws.getCell(r, 13).value = row.note ?? "";
+    [3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach((col) => applyMoneyFormat(ws.getCell(r, col)));
     ws.getCell(r, 2).numFmt = '0.00"%"';
     ws.getCell(r, 2).alignment = { horizontal: "right" };
-    ws.getCell(r, 7).fill = { type: "pattern", pattern: "solid", fgColor: { argb: REVERSAL_RED } };
-    ws.getCell(r, 7).font = { color: { argb: "FFB91C1C" }, bold: true };
-    ws.getCell(r, 8).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
-    ws.getCell(r, 8).font = { color: { argb: "FF15803D" }, bold: true };
+    ws.getCell(r, 10).fill = { type: "pattern", pattern: "solid", fgColor: { argb: REVERSAL_RED } };
+    ws.getCell(r, 10).font = { color: { argb: "FFB91C1C" }, bold: true };
+    ws.getCell(r, 11).fill = { type: "pattern", pattern: "solid", fgColor: { argb: RETAINED_GREEN } };
+    ws.getCell(r, 11).font = { color: { argb: "FF15803D" }, bold: true };
     applyZebra(ws.getRow(r), i % 2 === 1);
-    rowBorders(ws, r, 10);
+    rowBorders(ws, r, 13);
     r++;
   });
 
   // Final TOTALS row across all months
   if (opts.rows.length > 0) {
+    const sumTmIgst = opts.rows.reduce((s, x) => s + (x.tmIgst ?? 0), 0);
+    const sumTmCgst = opts.rows.reduce((s, x) => s + (x.tmCgst ?? 0), 0);
+    const sumTmSgst = opts.rows.reduce((s, x) => s + (x.tmSgst ?? 0), 0);
     const sumTm   = opts.rows.reduce((s, x) => s + x.monthlyItc, 0);
     const sumIgst = opts.rows.reduce((s, x) => s + x.igst, 0);
     const sumCgst = opts.rows.reduce((s, x) => s + x.cgst, 0);
@@ -377,16 +386,19 @@ export async function exportInvoiceXlsx(opts: InvoiceXlsxOptions, filename: stri
       c.font = { bold: true, color: { argb: color ?? HEADER_GREY } };
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
     };
-    writeTot(3, sumTm);
-    writeTot(4, sumIgst, "FFB91C1C");
-    writeTot(5, sumCgst, "FFB91C1C");
-    writeTot(6, sumSgst, "FFB91C1C");
-    writeTot(7, sumRev,  "FFB91C1C");
-    writeTot(8, sumRet,  "FF15803D");
-    writeTot(9, lastCum);
-    ws.getCell(r, 10).value = "";
-    ws.getCell(r, 10).fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
-    rowBorders(ws, r, 10);
+    writeTot(3, sumTmIgst);
+    writeTot(4, sumTmCgst);
+    writeTot(5, sumTmSgst);
+    writeTot(6, sumTm);
+    writeTot(7, sumIgst, "FFB91C1C");
+    writeTot(8, sumCgst, "FFB91C1C");
+    writeTot(9, sumSgst, "FFB91C1C");
+    writeTot(10, sumRev, "FFB91C1C");
+    writeTot(11, sumRet, "FF15803D");
+    writeTot(12, lastCum);
+    ws.getCell(r, 13).value = "";
+    ws.getCell(r, 13).fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUBHEAD_GREY } };
+    rowBorders(ws, r, 13);
     r++;
   }
 

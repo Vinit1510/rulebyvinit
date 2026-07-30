@@ -1769,6 +1769,9 @@ function PerInvoiceReport({ invoices, turnover }: { invoices: Invoice[]; turnove
       rows: visibleRows.map((r) => ({
         period: `${r.date.getFullYear()}-${String(r.date.getMonth()+1).padStart(2,"0")}`,
         ratio: r.ratio,
+        tmIgst: result.tmIgst,
+        tmCgst: result.tmCgst,
+        tmSgst: result.tmSgst,
         monthlyItc: r.monthlyItc,
         igst: r.igstReversal, cgst: r.cgstReversal, sgst: r.sgstReversal,
         reversal: r.reversal, retained: r.retained, cumReversal: r.cumulativeReversal,
@@ -1788,6 +1791,9 @@ function PerInvoiceReport({ invoices, turnover }: { invoices: Invoice[]; turnove
       rows: visibleRows.map((r) => ({
         period: `${r.date.getFullYear()}-${String(r.date.getMonth()+1).padStart(2,"0")}`,
         ratio: r.ratio,
+        tmIgst: result.tmIgst,
+        tmCgst: result.tmCgst,
+        tmSgst: result.tmSgst,
         monthlyItc: r.monthlyItc,
         igst: r.igstReversal, cgst: r.cgstReversal, sgst: r.sgstReversal,
         reversal: r.reversal, retained: r.retained, cumReversal: r.cumulativeReversal,
