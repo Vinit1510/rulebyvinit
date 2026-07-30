@@ -589,6 +589,9 @@ export async function downloadImportTemplate() {
     { header: "IGST Rate",        key: "igstRate",      width: 12 },
     { header: "CGST Rate",        key: "cgstRate",      width: 12 },
     { header: "SGST Rate",        key: "sgstRate",      width: 12 },
+    { header: "IGST Amount",      key: "igstAmount",    width: 14 },
+    { header: "CGST Amount",      key: "cgstAmount",    width: 14 },
+    { header: "SGST Amount",      key: "sgstAmount",    width: 14 },
     { header: "Usage",            key: "usage",         width: 14 },
     { header: "Personal / Non-Business Use", key: "nonBusinessUse", width: 26 },
     { header: "Block Credit",     key: "blockCredit",   width: 14 },
@@ -616,8 +619,8 @@ export async function downloadImportTemplate() {
       error: "Please select input, service, or capital_good from the dropdown.",
     };
 
-    // Column K (11): Usage
-    ws.getCell(r, 11).dataValidation = {
+    // Column N (14): Usage
+    ws.getCell(r, 14).dataValidation = {
       type: "list",
       allowBlank: true,
       formulae: ['"common, taxable, exempt, non-business"'],
@@ -626,8 +629,8 @@ export async function downloadImportTemplate() {
       error: "Please select common, taxable, exempt, or non-business from the dropdown.",
     };
 
-    // Column L (12): Personal / Non-Business Use
-    ws.getCell(r, 12).dataValidation = {
+    // Column O (15): Personal / Non-Business Use
+    ws.getCell(r, 15).dataValidation = {
       type: "list",
       allowBlank: true,
       formulae: ['"100% Business, 100% Personal (T1), Partial Personal (D2)"'],
@@ -636,8 +639,8 @@ export async function downloadImportTemplate() {
       error: "Please select 100% Business, 100% Personal (T1), or Partial Personal (D2) from the dropdown.",
     };
 
-    // Column M (13): Block Credit
-    ws.getCell(r, 13).dataValidation = {
+    // Column P (16): Block Credit
+    ws.getCell(r, 16).dataValidation = {
       type: "list",
       allowBlank: true,
       formulae: ['"No, Yes"'],
@@ -648,18 +651,18 @@ export async function downloadImportTemplate() {
   }
 
   const samples: Array<Record<string, string | number>> = [
-    { invoiceNo: "INV-001", purchaseDate: "15-04-2025", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", itemType: "capital_good", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "" },
-    { invoiceNo: "INV-002", purchaseDate: "10-05-2025", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", itemType: "capital_good", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "Inter-state" },
-    { invoiceNo: "INV-003", purchaseDate: "01-06-2025", supplier: "Auto World",      gstin: "27CCCCC3333C3Z3", itemType: "capital_good", assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
-    { invoiceNo: "INV-004", purchaseDate: "22-07-2025", supplier: "Global Consulting", gstin: "",                itemType: "service",      assetName: "Executive Mobile Phone", taxableValue: 75000, igstRate: 0, cgstRate: 9, sgstRate: 9, usage: "common", nonBusinessUse: "Partial Personal (D2)", blockCredit: "No", notes: "Triggers D2 5% reversal" },
-    { invoiceNo: "INV-005", purchaseDate: "25-07-2025", supplier: "Raw Materials Inc", gstin: "",                itemType: "input",        assetName: "Aluminium Sheets", taxableValue: 120000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  usage: "taxable", nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "Rule 42 item" },
+    { invoiceNo: "INV-001", purchaseDate: "15-04-2025", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", itemType: "capital_good", assetName: "CNC Machine",   taxableValue: 500000, igstRate: 0,  cgstRate: 9,  sgstRate: 9,  igstAmount: 0,      cgstAmount: 45000, sgstAmount: 45000, usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "" },
+    { invoiceNo: "INV-002", purchaseDate: "10-05-2025", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", itemType: "capital_good", assetName: "Forklift",      taxableValue: 250000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  igstAmount: 45000,  cgstAmount: 0,     sgstAmount: 0,     usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "Inter-state" },
+    { invoiceNo: "INV-003", purchaseDate: "01-06-2025", supplier: "Auto World",      gstin: "27CCCCC3333C3Z3", itemType: "capital_good", assetName: "Company Car",   taxableValue: 800000, igstRate: 0,  cgstRate: 14, sgstRate: 14, igstAmount: 0,      cgstAmount: 112000,sgstAmount: 112000,usage: "common",  nonBusinessUse: "100% Business",     blockCredit: "Yes", notes: "Sec 17(5)(a) — motor vehicle" },
+    { invoiceNo: "INV-004", purchaseDate: "22-07-2025", supplier: "Global Consulting", gstin: "",                itemType: "service",      assetName: "Executive Mobile Phone", taxableValue: 75000, igstRate: 0, cgstRate: 9, sgstRate: 9, igstAmount: 0, cgstAmount: 6750, sgstAmount: 6750, usage: "common", nonBusinessUse: "Partial Personal (D2)", blockCredit: "No", notes: "Triggers D2 5% reversal" },
+    { invoiceNo: "INV-005", purchaseDate: "25-07-2025", supplier: "Raw Materials Inc", gstin: "",                itemType: "input",        assetName: "Aluminium Sheets", taxableValue: 120000, igstRate: 18, cgstRate: 0,  sgstRate: 0,  igstAmount: 21600,  cgstAmount: 0,     sgstAmount: 0,     usage: "taxable", nonBusinessUse: "100% Business",     blockCredit: "No",  notes: "Rule 42 item" },
   ];
   samples.forEach((s, i) => {
     const rr = 2 + i;
     cols.forEach((col, ci) => {
       const cell = ws.getCell(rr, ci + 1);
       cell.value = (s as Record<string, string | number>)[col.key] ?? "";
-      if (col.key === "taxableValue") applyMoneyFormat(cell);
+      if (col.key === "taxableValue" || col.key.endsWith("Amount")) applyMoneyFormat(cell);
       if (["igstRate","cgstRate","sgstRate"].includes(col.key)) {
         cell.numFmt = '0.00';
         cell.alignment = { horizontal: "right" };
