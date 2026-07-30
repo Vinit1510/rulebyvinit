@@ -1433,7 +1433,11 @@ function ConsolidatedReport({
         });
       }
     }
-    return out;
+    return out.sort((a, b) => {
+      const pComp = a.period.localeCompare(b.period);
+      if (pComp !== 0) return pComp;
+      return (a.invoiceNo || "").localeCompare(b.invoiceNo || "");
+    });
   }, [perInvoice, filter]);
 
   // Distinct invoices (non-blocked) that have any schedule row in the filter window.
