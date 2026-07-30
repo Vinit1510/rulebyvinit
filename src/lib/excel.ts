@@ -641,11 +641,68 @@ export async function downloadImportTemplate() {
     rowBorders(ws, rr, cols.length);
   });
 
+  // ---- Sheet 3: Credit & Debit Notes Template ----
+  const cnWs = wb.addWorksheet("Credit & Debit Notes", { views: [{ state: "frozen", ySplit: 1 }] });
+  const cnCols = [
+    { header: "Document Type",      key: "docType",            width: 16 },
+    { header: "Credit Note Number", key: "invoiceNo",          width: 20 },
+    { header: "Note Date",          key: "purchaseDate",       width: 16 },
+    { header: "Original Invoice No", key: "originalInvoiceNo", width: 22 },
+    { header: "Supplier Name",      key: "supplier",           width: 26 },
+    { header: "Supplier GSTIN",      key: "gstin",              width: 18 },
+    { header: "Taxable Value",       key: "taxableValue",       width: 16 },
+    { header: "IGST Rate",           key: "igstRate",           width: 12 },
+    { header: "CGST Rate",           key: "cgstRate",           width: 12 },
+    { header: "SGST Rate",           key: "sgstRate",           width: 12 },
+    { header: "IGST Amount",         key: "igstAmount",         width: 14 },
+    { header: "CGST Amount",         key: "cgstAmount",         width: 14 },
+    { header: "SGST Amount",         key: "sgstAmount",         width: 14 },
+    { header: "Remarks / Reason",   key: "notes",              width: 30 },
+  ];
+  cnWs.columns = cnCols.map((c) => ({ width: c.width }));
+
+  cnCols.forEach((col, i) => {
+    const c = cnWs.getCell(1, i + 1);
+    c.value = col.header;
+    applyHeader(c);
+  });
+  cnWs.getRow(1).height = 30;
+
+  for (let r = 2; r <= 500; r++) {
+    cnWs.getCell(r, 1).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"credit_note, debit_note"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid Document Type",
+      error: "Please select credit_note or debit_note from the dropdown.",
+    };
+  }
+
+  const cnSamples = [
+    { docType: "credit_note", invoiceNo: "CN-001", purchaseDate: "20-05-2025", originalInvoiceNo: "INV-001", supplier: "Acme Industries", gstin: "27AAAAA1111A1Z1", taxableValue: 50000, igstRate: 0, cgstRate: 9, sgstRate: 9, notes: "Price discount on CNC Machine" },
+    { docType: "debit_note",  invoiceNo: "DN-001", purchaseDate: "25-05-2025", originalInvoiceNo: "INV-002", supplier: "Steel Mart",      gstin: "27BBBBB2222B2Z2", taxableValue: 15000, igstRate: 18, cgstRate: 0, sgstRate: 0, notes: "Additional freight charge" },
+  ];
+  cnSamples.forEach((s, i) => {
+    const rr = 2 + i;
+    cnCols.forEach((col, ci) => {
+      const cell = cnWs.getCell(rr, ci + 1);
+      cell.value = (s as Record<string, string | number>)[col.key] ?? "";
+      if (col.key === "taxableValue" || col.key.endsWith("Amount")) applyMoneyFormat(cell);
+      if (["igstRate","cgstRate","sgstRate"].includes(col.key)) {
+        cell.numFmt = '0.00';
+        cell.alignment = { horizontal: "right" };
+      }
+    });
+    applyZebra(cnWs.getRow(rr), i % 2 === 1);
+    rowBorders(cnWs, rr, cnCols.length);
+  });
+
   // Tip row
   const tipRow = 3 + notes.length + 1;
   legend.mergeCells(`A${tipRow}:C${tipRow}`);
   const tip = legend.getCell(`A${tipRow}`);
-  tip.value = 'Tip: only "Purchase Date" and "Taxable Value" are mandatory. The importer auto-detects the header row, so extra title / blank rows above the headers are tolerated. The header row is matched case-insensitively and ignores punctuation, so variants like "Invoice No", "Inv #", "Date (YYYY-MM-DD)", "IGST Rate %", "Supplier / Party" all work.';
+  tip.value = 'Tip: only "Purchase Date" and "Taxable Value" are mandatory. The importer auto-detects the header row across all sheets (Invoices & Credit Notes), so variants like "Original Invoice No", "Credit Note No", "Date", "IGST Amount" all work seamlessly.';
   tip.font = { italic: true, color: { argb: HEADER_GREY }, size: 10 };
   tip.alignment = { wrapText: true, vertical: "top" };
   legend.getRow(tipRow).height = 60;

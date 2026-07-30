@@ -398,9 +398,9 @@ async function parseFile(file: File): Promise<{ invoices: Invoice[]; skipped: nu
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      let fallbackResult = { invoices: [] as Invoice[], skipped: 0 };
+      const allRawRows: Record<string, string>[] = [];
       
-      // Try every sheet to find the correct data sheet
+      // Collect raw rows across all sheets (Invoices, Credit Notes, etc.)
       for (const name of wb.SheetNames) {
         const ws = wb.Sheets[name];
         const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "", blankrows: false }) as unknown[][];
@@ -417,21 +417,16 @@ async function parseFile(file: File): Promise<{ invoices: Invoice[]; skipped: nu
         if (knownHeadersCount === 0) continue;
 
         const dataRows = aoa.slice(headerRow + 1);
-        const rawRows: Record<string, unknown>[] = dataRows.map((r) => {
+        const rawRows = dataRows.map((r) => {
           const obj: Record<string, unknown> = {};
           headers.forEach((h, i) => { if (h) obj[h] = r[i]; });
           return obj;
         }).filter((obj) => Object.values(obj).some((v) => cellToString(v) !== ""));
-        
-        const result = parseRawRows(rawRows as Record<string, string>[]);
-        if (result.invoices.length > 0) {
-          return result;
-        }
-        if (result.skipped > fallbackResult.skipped) {
-          fallbackResult = result;
-        }
+
+        allRawRows.push(...(rawRows as Record<string, string>[]));
       }
-      return fallbackResult;
+
+      return parseRawRows(allRawRows);
     } catch (e) {
       return { invoices: [], skipped: 0, error: String(e) };
     }
