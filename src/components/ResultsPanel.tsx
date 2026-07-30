@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText, Calendar, Clock } from "lucide-react";
+import { Download, Printer, AlertCircle, ShieldAlert, Check, ChevronsUpDown, BarChart3, FileText, Calendar, Clock, Building2, Package } from "lucide-react";
 import {
   type Invoice, type MonthlyTurnover, type Rule43Result, type ConsolidatedRow,
   computeInvoice, consolidate, formatINR, formatINRPrecise, totalGstRate, computeItcComponents,
@@ -1155,34 +1155,112 @@ export function ResultsPanel({ invoices, turnover }: Props) {
 
   return (
     <div className="space-y-5 print-page">
-      {/* Top Level Rule Toggle */}
-      <div className="flex bg-muted/40 p-1.5 rounded-xl border gap-2 self-start w-full sm:w-auto no-print">
-        {(["rule43", "rule42", "combined"] as const).map((rt) => (
-          <button
-            key={rt}
-            type="button"
-            onClick={() => setReportType(rt)}
-            className={`text-xs px-5 py-2.5 rounded-lg font-semibold transition-all flex-1 sm:flex-none flex items-center gap-2 ${
-              reportType === rt
-                ? "bg-background text-foreground shadow-md border border-border"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {rt === "rule43" ? "Rule 43 (Capital Goods)" : rt === "rule42" ? "Rule 42 (Inputs & Services)" : "Final Total Reversal (Rule 42+43)"}
-          </button>
-        ))}
-      </div>
+      {/* Executive Unified Navigation Bar */}
+      <Card className="no-print border border-border/80 shadow-xs bg-card/80 backdrop-blur-md">
+        <CardContent className="p-3.5 space-y-3">
+          {/* Main Module Switcher */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1 hidden sm:inline-block">Module:</span>
+              <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-xl border">
+                <button
+                  type="button"
+                  onClick={() => setReportType("rule43")}
+                  className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                    reportType === "rule43"
+                      ? "bg-background text-foreground shadow-xs border"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                  Rule 43 (Capital Goods)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportType("rule42")}
+                  className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                    reportType === "rule42"
+                      ? "bg-background text-foreground shadow-xs border"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Package className="h-3.5 w-3.5 text-amber-500" />
+                  Rule 42 (Inputs & Services)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportType("combined")}
+                  className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                    reportType === "combined"
+                      ? "bg-background text-foreground shadow-xs border"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <BarChart3 className="h-3.5 w-3.5 text-indigo-500" />
+                  Combined (Rule 42+43)
+                </button>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground font-medium hidden md:block">
+              GST Apportionment &amp; Reversal Reports
+            </div>
+          </div>
+
+          {/* Sub-View Tabs for Rule 43 */}
+          {reportType === "rule43" && (
+            <div className="flex items-center gap-2 overflow-x-auto pt-0.5 scrollbar-none">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mr-1 shrink-0">Report View:</span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant={view === "consolidated" ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs font-semibold px-3"
+                  onClick={() => setView("consolidated")}
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                  Consolidated Schedule
+                </Button>
+                <Button
+                  type="button"
+                  variant={view === "per-invoice" ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs font-semibold px-3"
+                  onClick={() => setView("per-invoice")}
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1.5" />
+                  Per-Invoice Analysis
+                </Button>
+                <Button
+                  type="button"
+                  variant={view === "register" ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs font-semibold px-3"
+                  onClick={() => setView("register")}
+                >
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  Asset Register
+                </Button>
+                <Button
+                  type="button"
+                  variant={view === "block-credit" ? "destructive" : "outline"}
+                  size="sm"
+                  className={`h-8 text-xs font-semibold px-3 ${view === "block-credit" ? "shadow-xs" : "border-destructive/30 text-destructive hover:bg-destructive/10"}`}
+                  onClick={() => setView("block-credit")}
+                >
+                  <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
+                  Sec 17(5) Blocked Credit
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {reportType === "rule43" ? (
-        <Tabs value={view} onValueChange={setView}>
-          <TabsList>
-            <TabsTrigger value="consolidated">Rule 43 — Consolidated</TabsTrigger>
-            <TabsTrigger value="per-invoice">Rule 43 — Per-invoice</TabsTrigger>
-            <TabsTrigger value="register">Rule 43 — Register</TabsTrigger>
-            <TabsTrigger value="block-credit">Sec 17(5) Blocked Credit</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="consolidated" className="mt-4">
+        <>
+          {view === "consolidated" && (
             <ErrorBoundary fallbackTitle="Error loading Rule 43 Consolidated Report">
               <ConsolidatedReport
                 consol={consol}
@@ -1192,23 +1270,23 @@ export function ResultsPanel({ invoices, turnover }: Props) {
                 setFilter={setFilter}
               />
             </ErrorBoundary>
-          </TabsContent>
-          <TabsContent value="per-invoice" className="mt-4">
+          )}
+          {view === "per-invoice" && (
             <ErrorBoundary fallbackTitle="Error loading Per-Invoice Report">
               <PerInvoiceReport invoices={invoices} turnover={turnover} />
             </ErrorBoundary>
-          </TabsContent>
-          <TabsContent value="register" className="mt-4">
+          )}
+          {view === "register" && (
             <ErrorBoundary fallbackTitle="Error loading Register Summary">
               <RegisterSummary invoices={invoices} turnover={turnover} />
             </ErrorBoundary>
-          </TabsContent>
-          <TabsContent value="block-credit" className="mt-4">
+          )}
+          {view === "block-credit" && (
             <ErrorBoundary fallbackTitle="Error loading Blocked Credit Report">
               <BlockCreditReport invoices={invoices} />
             </ErrorBoundary>
-          </TabsContent>
-        </Tabs>
+          )}
+        </>
       ) : reportType === "rule42" ? (
         <ErrorBoundary fallbackTitle="Error loading Rule 42 Monthly Report">
           <Rule42MonthlyReport
