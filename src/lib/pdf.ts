@@ -42,6 +42,10 @@ export interface Rule43PdfOptions {
   totalEntries: number;
   totalCapitalGoodsValue: number;
   totalActualItc: number;
+  totalTmIgst?: number;
+  totalTmCgst?: number;
+  totalTmSgst?: number;
+  totalTmCombined?: number;
   totalReversal: number;
   netItcClaimed: number;
   detailedRows: PdfDetailedRow[];
@@ -69,6 +73,10 @@ export function exportRule43Pdf(opts: Rule43PdfOptions, filename: string) {
     ["Total Entries", String(opts.totalEntries)],
     ["Total Capital Goods Value", fmt(opts.totalCapitalGoodsValue)],
     ["Total ITC (incl. CN/DN adj.)", fmt(opts.totalActualItc)],
+    ["Monthly Common Credit Tm (IGST)", fmt(opts.totalTmIgst ?? 0)],
+    ["Monthly Common Credit Tm (CGST)", fmt(opts.totalTmCgst ?? 0)],
+    ["Monthly Common Credit Tm (SGST)", fmt(opts.totalTmSgst ?? 0)],
+    ["Total Monthly Common Credit Tm Pool", fmt(opts.totalTmCombined ?? 0)],
     ["Total Reversal", fmt(opts.totalReversal)],
     ["Net ITC Claimed", fmt(opts.netItcClaimed)],
   ];
