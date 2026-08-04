@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ShieldCheck, Key, ArrowLeft, Save,
-  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power, Phone, CalendarCheck
+  Users, KeyRound, Plus, Trash2, RefreshCw, Copy, Check, Lock, Unlock, Search, LogOut, Power, Phone, CalendarCheck, Wrench, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -53,6 +53,12 @@ export function AdminPage() {
   const [creatingCode, setCreatingCode] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Maintenance State
+  const [maintMode, setMaintMode] = useState(false);
+  const [maintMsg, setMaintMsg] = useState("WEBSITE UNDER MAINTENANCE");
+  const [maintContact, setMaintContact] = useState("support@rulebyvinit.com | +91 98765 43210");
+  const [savingMaint, setSavingMaint] = useState(false);
+
   // Search & Tab Filter State
   const [userSearch, setUserSearch] = useState("");
   const [codeTabFilter, setCodeTabFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
@@ -83,6 +89,9 @@ export function AdminPage() {
         getRenewalRequests(),
       ]);
       setSettings(s);
+      setMaintMode(Boolean(s.maintenanceMode));
+      setMaintMsg(s.maintenanceMessage || "WEBSITE UNDER MAINTENANCE");
+      setMaintContact(s.supportContact || "support@rulebyvinit.com | +91 98765 43210");
       setCodes(c);
       setUsers(u);
       setRenewals(r);
@@ -159,6 +168,58 @@ export function AdminPage() {
       toast({
         title: "Failed to update setting",
         description: "Please check your internet connection.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle Maintenance Mode Toggle
+  const handleToggleMaintenance = async (checked: boolean) => {
+    setSavingMaint(true);
+    const success = await updateAdminSettings({ maintenanceMode: checked });
+    setSavingMaint(false);
+    if (success) {
+      setMaintMode(checked);
+      setSettings((prev) => ({ ...prev, maintenanceMode: checked }));
+      toast({
+        title: checked ? "WEBSITE UNDER MAINTENANCE ENABLED (ON)" : "Website Restored & Active (OFF)",
+        description: checked
+          ? "Maintenance mode is ON: Access paused for all users."
+          : "Website is live and active for all users.",
+      });
+    } else {
+      toast({
+        title: "Failed to update maintenance mode",
+        description: "Please check your internet connection.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle Maintenance Details Save
+  const handleSaveMaintenanceInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingMaint(true);
+    const success = await updateAdminSettings({
+      maintenanceMode: maintMode,
+      maintenanceMessage: maintMsg.trim() || "WEBSITE UNDER MAINTENANCE",
+      supportContact: maintContact.trim() || "support@rulebyvinit.com | +91 98765 43210",
+    });
+    setSavingMaint(false);
+    if (success) {
+      setSettings((prev) => ({
+        ...prev,
+        maintenanceMode: maintMode,
+        maintenanceMessage: maintMsg.trim(),
+        supportContact: maintContact.trim(),
+      }));
+      toast({
+        title: "Maintenance Information Saved!",
+        description: "Custom headline and support contact text updated.",
+      });
+    } else {
+      toast({
+        title: "Failed to save maintenance details",
         variant: "destructive",
       });
     }
@@ -466,6 +527,79 @@ export function AdminPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Website Under Maintenance Control Card */}
+      <Card className="border border-destructive/40 bg-destructive/5 shadow-md">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-destructive">
+              <Wrench className="h-4 w-4" /> Website Under Maintenance Control
+            </CardTitle>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                maintMode
+                  ? "bg-destructive text-destructive-foreground border-destructive animate-pulse"
+                  : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+              }`}
+            >
+              {maintMode ? "ON (App Access Paused)" : "OFF (Website Live)"}
+            </span>
+          </div>
+          <CardDescription className="text-xs mt-1">
+            When Maintenance Mode is <strong>ON</strong>, no user can use the website. A large maintenance message and support contact info will be displayed. Admin panel remains accessible at <code>/vinit</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3.5 bg-background rounded-lg border">
+            <div className="space-y-0.5 pr-2">
+              <p className="text-xs font-bold text-foreground">
+                {maintMode ? "Maintenance Lock Active (ON)" : "Website Operating Normally (OFF)"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {maintMode
+                  ? "All app screens (Dashboard, Invoices, Turnover, Reports) are locked behind the Maintenance screen."
+                  : "Users can navigate and use the application freely."}
+              </p>
+            </div>
+
+            <Switch
+              checked={maintMode}
+              onCheckedChange={handleToggleMaintenance}
+              disabled={savingMaint}
+            />
+          </div>
+
+          <form onSubmit={handleSaveMaintenanceInfo} className="space-y-3 pt-2 border-t">
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-foreground">Big Headline Message (Displayed on Maintenance Screen)</Label>
+              <Input
+                type="text"
+                placeholder="e.g. WEBSITE UNDER MAINTENANCE"
+                value={maintMsg}
+                onChange={(e) => setMaintMsg(e.target.value)}
+                className="text-xs h-9 font-bold uppercase"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-foreground">Small Font Support Contact Info (Displayed at Bottom)</Label>
+              <Input
+                type="text"
+                placeholder="e.g. Contact Support Team: support@rulebyvinit.com | +91 98765 43210"
+                value={maintContact}
+                onChange={(e) => setMaintContact(e.target.value)}
+                className="text-xs h-9"
+                required
+              />
+            </div>
+
+            <Button type="submit" size="sm" variant="outline" className="w-full h-8 text-xs font-semibold gap-1.5" disabled={savingMaint}>
+              <Save className="h-3.5 w-3.5" /> Save Maintenance Text &amp; Support Info
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Grid Section 1: Activation Toggle & Admin Password */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -126,13 +126,21 @@ export async function getAdminSettings(): Promise<AdminSettings> {
       const parsed = parseFirestoreDoc(doc);
       return {
         activationRequired: Boolean(parsed.activationRequired ?? false),
+        maintenanceMode: Boolean(parsed.maintenanceMode ?? false),
+        maintenanceMessage: parsed.maintenanceMessage ?? "WEBSITE UNDER MAINTENANCE",
+        supportContact: parsed.supportContact ?? "support@rulebyvinit.com | +91 98765 43210",
         updatedAt: parsed.updatedAt ?? new Date().toISOString(),
       };
     }
   } catch (e) {
     console.error("Failed to fetch admin settings:", e);
   }
-  return { activationRequired: false };
+  return {
+    activationRequired: false,
+    maintenanceMode: false,
+    maintenanceMessage: "WEBSITE UNDER MAINTENANCE",
+    supportContact: "support@rulebyvinit.com | +91 98765 43210",
+  };
 }
 
 /** Update Master Admin Settings */
@@ -143,7 +151,10 @@ export async function updateAdminSettings(settings: Partial<AdminSettings>): Pro
       updatedAt: new Date().toISOString(),
     });
 
-    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config?updateMask.fieldPaths=activationRequired&updateMask.fieldPaths=updatedAt`, {
+    const updateMasks = Object.keys(settings).map((k) => `updateMask.fieldPaths=${k}`).join("&");
+    const maskQuery = updateMasks ? `?${updateMasks}&updateMask.fieldPaths=updatedAt` : `?updateMask.fieldPaths=updatedAt`;
+
+    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config${maskQuery}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),

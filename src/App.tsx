@@ -23,7 +23,7 @@ import { useCalculator } from "@/hooks/useCalculator";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { unionMonths } from "@/lib/rule43";
-import { getAdminSettings, verifyActivationCode, logUserSignIn } from "@/lib/firebase";
+import { type AdminSettings, getAdminSettings, verifyActivationCode, logUserSignIn } from "@/lib/firebase";
 import { secureStorage } from "@/lib/secureStorage";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -429,22 +429,57 @@ function ProtectedRoute() {
   return <MainApp />;
 }
 
+import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { AdminPage } from "@/pages/AdminPage";
+
+function AppContent() {
+  const [settings, setSettings] = useState<AdminSettings | null>(null);
+  const [location] = useLocation();
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const s = await getAdminSettings();
+      if (active) setSettings(s);
+    })();
+
+    // Poll every 10 seconds for live maintenance mode updates
+    const interval = setInterval(async () => {
+      const s = await getAdminSettings();
+      if (active) setSettings(s);
+    }, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const isMaintenance = Boolean(settings?.maintenanceMode) && location !== "/vinit";
+
+  if (isMaintenance) {
+    return <MaintenanceOverlay settings={settings!} />;
+  }
+
+  return (
+    <RouteSwitch>
+      <Route path="/vinit" component={AdminPage} />
+      <Route path="/sign-in" component={AuthPage} />
+      <Route path="/dashboard" component={ProtectedRoute} />
+      <Route path="/invoices" component={ProtectedRoute} />
+      <Route path="/turnover" component={ProtectedRoute} />
+      <Route path="/reports" component={ProtectedRoute} />
+      <Route path="/" component={ProtectedRoute} />
+      <Route component={ProtectedRoute} />
+    </RouteSwitch>
+  );
+}
 
 function App() {
   return (
     <WouterRouter base={basePath}>
       <TooltipProvider delayDuration={150}>
-        <RouteSwitch>
-          <Route path="/vinit" component={AdminPage} />
-          <Route path="/sign-in" component={AuthPage} />
-          <Route path="/dashboard" component={ProtectedRoute} />
-          <Route path="/invoices" component={ProtectedRoute} />
-          <Route path="/turnover" component={ProtectedRoute} />
-          <Route path="/reports" component={ProtectedRoute} />
-          <Route path="/" component={ProtectedRoute} />
-          <Route component={ProtectedRoute} />
-        </RouteSwitch>
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </WouterRouter>
