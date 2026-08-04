@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Wrench, Phone, ShieldAlert, Lock, ArrowRight } from "lucide-react";
+import { Wrench, Phone, ShieldAlert, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { AdminSettings } from "@/lib/firebase";
 
@@ -62,16 +62,6 @@ export function MaintenanceOverlay({ settings }: { settings?: AdminSettings }) {
                 <Phone className="h-3.5 w-3.5 text-primary shrink-0" />
                 <span className="text-xs">{contact}</span>
               </div>
-            </div>
-
-            {/* Admin Access Button */}
-            <div className="pt-2 flex justify-center">
-              <a
-                href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/vinit`}
-                className="text-[11px] text-muted-foreground hover:text-foreground underline flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity"
-              >
-                Admin Control Login <ArrowRight className="h-3 w-3" />
-              </a>
             </div>
           </CardContent>
         </Card>
