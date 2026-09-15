@@ -158,6 +158,8 @@ export async function getAdminSettings(): Promise<AdminSettings> {
   return cached || defaultSettings;
 }
 
+const ADMIN_SECRET = "vinit@2026";
+
 /** Update Master Admin Settings with local broadcast and Firestore sync */
 export async function updateAdminSettings(settings: Partial<AdminSettings>): Promise<boolean> {
   // 1. Immediately cache locally and broadcast across tabs
@@ -165,6 +167,7 @@ export async function updateAdminSettings(settings: Partial<AdminSettings>): Pro
   const merged: AdminSettings = {
     ...current,
     ...settings,
+    adminSecret: ADMIN_SECRET,
     updatedAt: new Date().toISOString(),
   };
 
@@ -236,13 +239,14 @@ export async function createActivationCode(
       ? new Date(`${customExpiryDate}T23:59:59.000Z`).toISOString()
       : calculateFYEndDate(financialYear);
 
-    const record: ActivationCode = {
+    const record: ActivationCode & { adminSecret: string } = {
       id,
       code: code.toUpperCase().trim(),
       clientName: clientName.trim() || "General Client",
       status: "active",
       financialYear,
       validUntil,
+      adminSecret: ADMIN_SECRET,
       createdAt: new Date().toISOString(),
     };
 
@@ -270,7 +274,7 @@ export async function updateCodeStatus(
   newFY?: string
 ): Promise<boolean> {
   try {
-    const data: Record<string, any> = { status };
+    const data: Record<string, any> = { status, adminSecret: ADMIN_SECRET };
     if (usedByEmail) data.usedByEmail = usedByEmail;
     if (usedByMobile) data.usedByMobile = usedByMobile;
     if (status === "redeemed") data.usedAt = new Date().toISOString();
@@ -501,8 +505,8 @@ export async function getRenewalRequests(): Promise<RenewalRequest[]> {
 /** Approve / Reject Renewal Request */
 export async function updateRenewalRequestStatus(requestId: string, status: "approved" | "rejected"): Promise<boolean> {
   try {
-    const fields = formatFirestoreFields({ status });
-    const res = await fetch(`${FIRESTORE_BASE_URL}/renewal_requests/${requestId}?updateMask.fieldPaths=status`, {
+    const fields = formatFirestoreFields({ status, adminSecret: ADMIN_SECRET });
+    const res = await fetch(`${FIRESTORE_BASE_URL}/renewal_requests/${requestId}?updateMask.fieldPaths=status&updateMask.fieldPaths=adminSecret`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
