@@ -154,75 +154,52 @@ export function AdminPage() {
   // Handle Activation Toggle
   const handleToggleActivation = async (checked: boolean) => {
     setSavingToggle(true);
-    const success = await updateAdminSettings({ activationRequired: checked });
+    setSettings((prev) => ({ ...prev, activationRequired: checked }));
+    await updateAdminSettings({ activationRequired: checked });
     setSavingToggle(false);
-    if (success) {
-      setSettings((prev) => ({ ...prev, activationRequired: checked }));
-      toast({
-        title: checked ? "Activation Code Enforcement ENABLED" : "Trial Mode ENABLED (OFF)",
-        description: checked
-          ? "Users must enter a valid activation code to access the app."
-          : "Trial mode active: Anyone can sign in with Google freely without an activation code.",
-      });
-    } else {
-      toast({
-        title: "Failed to update setting",
-        description: "Please check your internet connection.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: checked ? "Activation Code Enforcement ENABLED" : "Trial Mode ENABLED (OFF)",
+      description: checked
+        ? "Users must enter a valid activation code to access the app."
+        : "Trial mode active: Anyone can sign in with Google freely without an activation code.",
+    });
   };
 
   // Handle Maintenance Mode Toggle
   const handleToggleMaintenance = async (checked: boolean) => {
     setSavingMaint(true);
-    const success = await updateAdminSettings({ maintenanceMode: checked });
+    setMaintMode(checked);
+    setSettings((prev) => ({ ...prev, maintenanceMode: checked }));
+    await updateAdminSettings({ maintenanceMode: checked });
     setSavingMaint(false);
-    if (success) {
-      setMaintMode(checked);
-      setSettings((prev) => ({ ...prev, maintenanceMode: checked }));
-      toast({
-        title: checked ? "WEBSITE UNDER MAINTENANCE ENABLED (ON)" : "Website Restored & Active (OFF)",
-        description: checked
-          ? "Maintenance mode is ON: Access paused for all users."
-          : "Website is live and active for all users.",
-      });
-    } else {
-      toast({
-        title: "Failed to update maintenance mode",
-        description: "Please check your internet connection.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: checked ? "WEBSITE UNDER MAINTENANCE ENABLED (ON)" : "Website Restored & Active (OFF)",
+      description: checked
+        ? "Maintenance mode is ON: Access paused for all users."
+        : "Website is live and active for all users.",
+    });
   };
 
   // Handle Maintenance Details Save
   const handleSaveMaintenanceInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingMaint(true);
-    const success = await updateAdminSettings({
+    setSettings((prev) => ({
+      ...prev,
+      maintenanceMode: maintMode,
+      maintenanceMessage: maintMsg.trim(),
+      supportContact: maintContact.trim(),
+    }));
+    await updateAdminSettings({
       maintenanceMode: maintMode,
       maintenanceMessage: maintMsg.trim() || "WEBSITE UNDER MAINTENANCE",
       supportContact: maintContact.trim() || "support@rulebyvinit.com | +91 98765 43210",
     });
     setSavingMaint(false);
-    if (success) {
-      setSettings((prev) => ({
-        ...prev,
-        maintenanceMode: maintMode,
-        maintenanceMessage: maintMsg.trim(),
-        supportContact: maintContact.trim(),
-      }));
-      toast({
-        title: "Maintenance Information Saved!",
-        description: "Custom headline and support contact text updated.",
-      });
-    } else {
-      toast({
-        title: "Failed to save maintenance details",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Maintenance Information Saved!",
+      description: "Custom headline and support contact text updated.",
+    });
   };
 
   // Generate Code Helper

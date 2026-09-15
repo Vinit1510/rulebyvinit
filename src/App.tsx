@@ -433,29 +433,65 @@ import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { AdminPage } from "@/pages/AdminPage";
 
 function AppContent() {
-  const [settings, setSettings] = useState<AdminSettings | null>(null);
+  const [settings, setSettings] = useState<AdminSettings | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const c = localStorage.getItem("r43_admin_settings_cache");
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return null;
+  });
   const [location] = useLocation();
 
   useEffect(() => {
     let active = true;
+
+    // 1. Initial fetch
     (async () => {
       const s = await getAdminSettings();
       if (active) setSettings(s);
     })();
 
-    // Poll every 10 seconds for live maintenance mode updates
+    // 2. Real-time in-window event listener
+    const handleCustom = (e: any) => {
+      if (e.detail) setSettings((prev) => ({ ...prev, ...e.detail }));
+    };
+    window.addEventListener("r43_admin_settings_change", handleCustom);
+
+    // 3. Cross-tab storage event listener
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "r43_admin_settings_cache" && e.newValue) {
+        try { setSettings(JSON.parse(e.newValue)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    // 4. Cross-tab BroadcastChannel listener
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("r43_settings_channel");
+      bc.onmessage = (ev) => {
+        if (ev.data) setSettings(ev.data);
+      };
+    } catch {}
+
+    // 5. Polling fallback every 5 seconds for remote clients
     const interval = setInterval(async () => {
       const s = await getAdminSettings();
       if (active) setSettings(s);
-    }, 10000);
+    }, 5000);
 
     return () => {
       active = false;
       clearInterval(interval);
+      window.removeEventListener("r43_admin_settings_change", handleCustom);
+      window.removeEventListener("storage", handleStorage);
+      if (bc) bc.close();
     };
   }, []);
 
-  const isMaintenance = Boolean(settings?.maintenanceMode) && location !== "/vinit";
+  const isMaintenance = Boolean(settings?.maintenanceMode) && !location.startsWith("/vinit");
 
   if (isMaintenance) {
     return <MaintenanceOverlay settings={settings!} />;

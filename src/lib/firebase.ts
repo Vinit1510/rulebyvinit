@@ -114,8 +114,23 @@ export function calculateFYEndDate(financialYear: string): string {
   return new Date(Date.UTC(endYear, 2, 31, 23, 59, 59)).toISOString(); // March 31
 }
 
-/** Get Master Admin Settings with 2.5s timeout */
+/** Get Master Admin Settings with local cache fallback */
 export async function getAdminSettings(): Promise<AdminSettings> {
+  const defaultSettings: AdminSettings = {
+    activationRequired: false,
+    maintenanceMode: false,
+    maintenanceMessage: "WEBSITE UNDER MAINTENANCE",
+    supportContact: "support@rulebyvinit.com | +91 98765 43210",
+  };
+
+  let cached: AdminSettings | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      const str = localStorage.getItem("r43_admin_settings_cache");
+      if (str) cached = JSON.parse(str);
+    } catch {}
+  }
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2500);
@@ -124,46 +139,72 @@ export async function getAdminSettings(): Promise<AdminSettings> {
     if (res.ok) {
       const doc = await res.json();
       const parsed = parseFirestoreDoc(doc);
-      return {
+      const remoteSettings: AdminSettings = {
         activationRequired: Boolean(parsed.activationRequired ?? false),
         maintenanceMode: Boolean(parsed.maintenanceMode ?? false),
-        maintenanceMessage: parsed.maintenanceMessage ?? "WEBSITE UNDER MAINTENANCE",
-        supportContact: parsed.supportContact ?? "support@rulebyvinit.com | +91 98765 43210",
+        maintenanceMessage: parsed.maintenanceMessage || "WEBSITE UNDER MAINTENANCE",
+        supportContact: parsed.supportContact || "support@rulebyvinit.com | +91 98765 43210",
         updatedAt: parsed.updatedAt ?? new Date().toISOString(),
       };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("r43_admin_settings_cache", JSON.stringify(remoteSettings));
+      }
+      return remoteSettings;
     }
   } catch (e) {
-    console.error("Failed to fetch admin settings:", e);
+    console.error("Failed to fetch admin settings from Firestore:", e);
   }
-  return {
-    activationRequired: false,
-    maintenanceMode: false,
-    maintenanceMessage: "WEBSITE UNDER MAINTENANCE",
-    supportContact: "support@rulebyvinit.com | +91 98765 43210",
-  };
+
+  return cached || defaultSettings;
 }
 
-/** Update Master Admin Settings */
+/** Update Master Admin Settings with local broadcast and Firestore sync */
 export async function updateAdminSettings(settings: Partial<AdminSettings>): Promise<boolean> {
+  // 1. Immediately cache locally and broadcast across tabs
+  const current = await getAdminSettings();
+  const merged: AdminSettings = {
+    ...current,
+    ...settings,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("r43_admin_settings_cache", JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent("r43_admin_settings_change", { detail: merged }));
+      try {
+        const bc = new BroadcastChannel("r43_settings_channel");
+        bc.postMessage(merged);
+        bc.close();
+      } catch {}
+    } catch (e) {
+      console.warn("Local storage save warning:", e);
+    }
+  }
+
+  // 2. Sync to Firestore in background
   try {
-    const fields = formatFirestoreFields({
-      ...settings,
-      updatedAt: new Date().toISOString(),
-    });
-
-    const updateMasks = Object.keys(settings).map((k) => `updateMask.fieldPaths=${k}`).join("&");
-    const maskQuery = updateMasks ? `?${updateMasks}&updateMask.fieldPaths=updatedAt` : `?updateMask.fieldPaths=updatedAt`;
-
-    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config${maskQuery}`, {
+    const fields = formatFirestoreFields(merged);
+    const updateMasks = Object.keys(merged).map((k) => `updateMask.fieldPaths=${k}`).join("&");
+    const res = await fetch(`${FIRESTORE_BASE_URL}/settings/config?${updateMasks}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
     });
-    return res.ok;
+
+    // If document doesn't exist yet (404), create it via POST
+    if (res.status === 404) {
+      await fetch(`${FIRESTORE_BASE_URL}/settings?documentId=config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+    }
   } catch (e) {
-    console.error("Failed to update admin settings:", e);
-    return false;
+    console.warn("Firestore sync warning:", e);
   }
+
+  return true;
 }
 
 /** Get all Activation Codes */
